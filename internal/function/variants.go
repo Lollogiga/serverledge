@@ -1,91 +1,98 @@
 package function
 
 import (
+	"errors"
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 )
 
-// generateVariants prende la funzione base e produce light, medium e heavy.
 func GenerateVariants(base Function) ([]Function, error) {
-
-	envLight := map[string]string{}
-	envMedium := map[string]string{}
-	envHeavy := map[string]string{}
-
-	for key, raw := range base.ApproxConfig {
-
-		switch v := raw.(type) {
-
-		// Caso: min/max → generazione automatica numerica
-		case map[string]interface{}:
-
-			hasMin := v["min"]
-			hasMax := v["max"]
-			hasLight := v["light"]
-			hasMedium := v["medium"]
-			hasHeavy := v["heavy"]
-
-			// Caso 1: numerico min/max
-			if hasMin != nil && hasMax != nil {
-				min := toFloat(v["min"])
-				max := toFloat(v["max"])
-				mid := math.Sqrt(min * max)
-
-				envLight["APPROX_"+strings.ToUpper(key)] = fmt.Sprintf("%g", min)
-				envMedium["APPROX_"+strings.ToUpper(key)] = fmt.Sprintf("%g", mid)
-				envHeavy["APPROX_"+strings.ToUpper(key)] = fmt.Sprintf("%g", max)
-				continue
-			}
-
-			// Caso 2: valori espliciti light/medium/heavy
-			if hasLight != nil && hasMedium != nil && hasHeavy != nil {
-				envLight["APPROX_"+strings.ToUpper(key)] = stringify(v["light"])
-				envMedium["APPROX_"+strings.ToUpper(key)] = stringify(v["medium"])
-				envHeavy["APPROX_"+strings.ToUpper(key)] = stringify(v["heavy"])
-				continue
-			}
-
-		// Caso: valore singolo → copia su tutte le varianti
-		default:
-			common := stringify(v)
-			envLight["APPROX_"+strings.ToUpper(key)] = common
-			envMedium["APPROX_"+strings.ToUpper(key)] = common
-			envHeavy["APPROX_"+strings.ToUpper(key)] = common
-		}
+	if base.ApproxConfig == nil || len(base.ApproxConfig) == 0 {
+		return nil, errors.New("no approx_config provided")
 	}
 
-	// Costruisci i 3 cloni
-	light := base
-	medium := base
-	heavy := base
+	light := cloneFunction(base)
+	medium := cloneFunction(base)
+	heavy := cloneFunction(base)
 
 	light.Name = base.Name + "_light"
 	medium.Name = base.Name + "_medium"
-	heavy.Name = base.Name // default = heavy
+	heavy.Name = base.Name
 
-	light.Env = envLight
-	medium.Env = envMedium
-	heavy.Env = envHeavy
+	light.Env["APPROX_VARIANT"] = "light"
+	medium.Env["APPROX_VARIANT"] = "medium"
+	heavy.Env["APPROX_VARIANT"] = "heavy"
+
+	for key, raw := range base.ApproxConfig {
+
+		cfg, ok := raw.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("invalid approx_config format for %s", key)
+		}
+
+		min, minOk := cfg["min"]
+		max, maxOk := cfg["max"]
+
+		if minOk && maxOk {
+			minF := toFloat(min)
+			maxF := toFloat(max)
+			mid := math.Sqrt(minF * maxF)
+
+			envKey := "APPROX_" + toEnvName(key)
+
+			light.Env[envKey] = fmt.Sprintf("%g", minF)
+			medium.Env[envKey] = fmt.Sprintf("%g", mid)
+			heavy.Env[envKey] = fmt.Sprintf("%g", maxF)
+
+			continue
+		}
+
+		if l, ok := cfg["light"]; ok {
+			light.Env["APPROX_"+toEnvName(key)] = fmt.Sprintf("%v", l)
+		}
+		if m, ok := cfg["medium"]; ok {
+			medium.Env["APPROX_"+toEnvName(key)] = fmt.Sprintf("%v", m)
+		}
+		if h, ok := cfg["heavy"]; ok {
+			heavy.Env["APPROX_"+toEnvName(key)] = fmt.Sprintf("%v", h)
+		}
+	}
 
 	return []Function{light, medium, heavy}, nil
 }
 
-func stringify(v interface{}) string {
-	return fmt.Sprintf("%v", v)
+// -------------------------
+// HELPERS
+// -------------------------
+
+func cloneFunction(f Function) Function {
+	nf := f
+
+	// copia profonda delle variabili d’ambiente
+	nf.Env = make(map[string]string)
+	if f.Env != nil {
+		for k, v := range f.Env {
+			nf.Env[k] = v
+		}
+	}
+
+	return nf
+}
+
+func toEnvName(s string) string {
+	return strings.ToUpper(strings.ReplaceAll(s, " ", "_"))
 }
 
 func toFloat(v interface{}) float64 {
-	switch t := v.(type) {
+	switch x := v.(type) {
 	case float64:
-		return t
+		return x
+	case float32:
+		return float64(x)
 	case int:
-		return float64(t)
-	case string:
-		f, _ := strconv.ParseFloat(t, 64)
-		return f
+		return float64(x)
 	default:
-		return 0.0
+		panic("value is not numeric")
 	}
 }
