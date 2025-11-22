@@ -23,6 +23,8 @@ type Function struct {
 	TarFunctionCode string  // input is .tar
 	CustomImage     string  // used if custom runtime is chosen
 	Signature       *Signature
+	ApproxConfig    map[string]interface{} `json:"approx_config,omitempty"`
+	Env             map[string]string
 }
 
 func (f *Function) getEtcdKey() string {

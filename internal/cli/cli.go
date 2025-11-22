@@ -110,6 +110,7 @@ var update bool
 var maxConcurrency int16
 var prewarmCount int64
 var forcePull bool
+var profileFile string
 
 func Init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
@@ -137,6 +138,7 @@ func Init() {
 	createCmd.Flags().StringVarP(&customImage, "custom_image", "", "", "custom container image (only if runtime == 'custom')")
 	createCmd.Flags().StringSliceVarP(&inputs, "input", "i", nil, "Input parameter: <name>:<type>")
 	createCmd.Flags().StringSliceVarP(&outputs, "output", "o", nil, "Output specification: <name>:<type>")
+	createCmd.Flags().StringVarP(&profileFile, "profile_file", "", "", "Optional JSON file for automatic variant generation")
 
 	rootCmd.AddCommand(prewarmCmd)
 	prewarmCmd.Flags().StringVarP(&funcName, "function", "f", "", "name of the function")
@@ -152,7 +154,6 @@ func Init() {
 
 	rootCmd.AddCommand(pollCmd)
 	pollCmd.Flags().StringVarP(&requestId, "request", "", "", "ID of the async request")
-
 	// Workflow
 
 	rootCmd.AddCommand(compInvokeCmd)
@@ -354,6 +355,21 @@ func create(cmd *cobra.Command, args []string) {
 		sig = function.NewSignature().Build()
 	}
 
+	var approxConfig map[string]interface{}
+	if profileFile != "" {
+		data, err := os.ReadFile(profileFile)
+		if err != nil {
+			fmt.Printf("Could not read profile_file '%s': %v\n", profileFile, err)
+			os.Exit(1)
+		}
+
+		err = json.Unmarshal(data, &approxConfig)
+		if err != nil {
+			fmt.Printf("Invalid JSON in profile_file: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	request := function.Function{
 		Name:            funcName,
 		Handler:         handler,
@@ -364,6 +380,7 @@ func create(cmd *cobra.Command, args []string) {
 		TarFunctionCode: encoded,
 		CustomImage:     customImage,
 		Signature:       sig,
+		ApproxConfig:    approxConfig,
 	}
 	requestBody, err := json.Marshal(request)
 	if err != nil {

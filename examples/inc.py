@@ -1,3 +1,4 @@
 def handler(params, context):
     print(f"Invoked inc with input: {params}")
-    return int(params["input"]) + 1
+    # Usa 'n' invece di 'input'
+    return int(params["n"]) + 1

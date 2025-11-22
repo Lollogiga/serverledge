@@ -1,0 +1,12 @@
+{
+  "model": {
+    "light": "mobilenet",
+    "medium": "efficientnet_b0",
+    "heavy": "resnet50"
+  },
+  "aug": {
+    "light": "resize",
+    "medium": "resize,flip",
+    "heavy": "resize,flip,crop"
+  }
+}

@@ -146,7 +146,6 @@ func CreateOrUpdateFunction(c echo.Context) error {
 			log.Printf("Dropping request for already existing function '%s'\n", f.Name)
 			return c.String(http.StatusConflict, "")
 		}
-
 		log.Printf("New request: creation of %s\n", f.Name)
 	} else {
 		log.Printf("New request: creation/update of %s\n", f.Name)
@@ -177,6 +176,30 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		f.MaxConcurrency = 1
 	}
 
+	// --- INIZIO MODIFICA PER VARIANTI AUTOMATICHE --- //
+	if len(f.ApproxConfig) > 0 {
+		log.Printf("Approximation config detected. Generating variants for %s...\n", f.Name)
+
+		variants, err := function.GenerateVariants(f)
+		if err != nil {
+			log.Printf("Variant generation failed: %v\n", err)
+			return c.JSON(http.StatusInternalServerError, "Variant generation failed")
+		}
+
+		for _, v := range variants {
+			log.Printf("Creating variant: %s\n", v.Name)
+			if err := v.SaveToEtcd(); err != nil {
+				log.Printf("Failed creating variant %s: %v\n", v.Name, err)
+				return c.JSON(http.StatusServiceUnavailable, "")
+			}
+		}
+
+		response := struct{ Created string }{f.Name}
+		return c.JSON(http.StatusOK, response)
+	}
+	// --- FINE MODIFICA PER VARIANTI AUTOMATICHE --- //
+
+	// Comportamento normale
 	err = f.SaveToEtcd()
 	if err != nil {
 		log.Printf("Failed creation: %v\n", err)
