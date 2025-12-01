@@ -30,9 +30,10 @@ func CreateContainer(f *function.Function, forceImagePull bool) (*Container, err
 	opts := &ContainerOptions{
 		MemoryMB: f.MemoryMB,
 		CPUQuota: f.CPUDemand,
+		Function: f.Name,
 	}
 
-	// 🔥 MERGE delle env generate per la variante (APPROX_*)
+	// MERGE delle env generate per la variante (APPROX_*)
 	if f.Env != nil && len(f.Env) > 0 {
 		opts.Env = make([]string, 0, len(f.Env))
 		for k, v := range f.Env {
