@@ -5,11 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/serverledge-faas/serverledge/internal/function"
 	"io"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/serverledge-faas/serverledge/internal/function"
 
 	"github.com/serverledge-faas/serverledge/internal/executor"
 )
@@ -21,15 +22,17 @@ func CreateContainer(f *function.Function, forceImagePull bool) (*Container, err
 		return nil, err
 	}
 	if forceImagePull {
-		err := cf.PullImage(image)
-		if err != nil {
+		if err := cf.PullImage(image); err != nil {
 			return nil, err
 		}
 	}
-	return newContainer(image, f.TarFunctionCode, &ContainerOptions{
+
+	opts := &ContainerOptions{
 		MemoryMB: f.MemoryMB,
 		CPUQuota: f.CPUDemand,
-	})
+		Function: f.Name,
+	}
+	return newContainer(image, f.TarFunctionCode, opts)
 }
 
 func getImageForFunction(fun *function.Function) (string, error) {

@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/google/uuid"
 	"github.com/serverledge-faas/serverledge/internal/config"
 	//	"github.com/docker/docker/pkg/stdcopy"
 )
@@ -45,12 +46,18 @@ func (cf *DockerFactory) Create(image string, opts *ContainerOptions) (Container
 		contResources.CPUQuota = (int64)(50000.0 * opts.CPUQuota)
 	}
 
+	functionName := strings.ReplaceAll(opts.Function, "/", "_")
+
+	uuidStr := uuid.New().String()
+
+	containerName := fmt.Sprintf("sl-%s-%s", functionName, uuidStr)
+
 	resp, err := cf.cli.ContainerCreate(cf.ctx, &container.Config{
 		Image: image,
 		Cmd:   opts.Cmd,
 		Env:   opts.Env,
 		Tty:   false,
-	}, &container.HostConfig{Resources: contResources}, nil, nil, "")
+	}, &container.HostConfig{Resources: contResources}, nil, nil, containerName)
 
 	if err != nil {
 		log.Printf("Could not create the container: %v\n", err)
