@@ -15,7 +15,7 @@ executor:
 	CGO_ENABLED=0 $(GO) build -o $(BIN)/$@ cmd/$@/executor.go
 
 DOCKERHUB_USER=grussorusso
-images:  image-python310 image-nodejs17ng image-base image-native
+images:  image-python310 image-nodejs17ng image-base image-native image-python-ml
 image-python310:
 	docker build -t $(DOCKERHUB_USER)/serverledge-python310 -f images/python310/Dockerfile .
 image-base:
@@ -24,11 +24,15 @@ image-nodejs17ng:
 	docker build -t $(DOCKERHUB_USER)/serverledge-nodejs17ng -f images/nodejs17ng/Dockerfile .
 image-native:
 	docker build -t $(DOCKERHUB_USER)/serverledge-native -f images/native/Dockerfile .
+image-python-ml:
+	docker build -t $(DOCKERHUB_USER)/serverledge-python-ml -f images/python-ml/Dockerfile .
 
 push-images:
 	docker push $(DOCKERHUB_USER)/serverledge-python310
 	docker push $(DOCKERHUB_USER)/serverledge-base
 	docker push $(DOCKERHUB_USER)/serverledge-nodejs17ng
+	docker push $(DOCKERHUB_USER)/serverledge-native
+	docker push $(DOCKERHUB_USER)/serverledge-python-ml
 
 test:
 	go test -v ./...
