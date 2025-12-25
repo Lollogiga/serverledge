@@ -90,7 +90,7 @@ log_ok "Prometheus started"
 log_info "Starting Grafana"
 d run -d \
   --name grafana \
-  -p 3000:3000 \
+  --network host \
   grafana/grafana
 
 log_ok "Grafana started (http://localhost:3000)"

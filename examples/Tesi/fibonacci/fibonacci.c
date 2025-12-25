@@ -19,25 +19,29 @@ static int parse_x(int argc, char **argv) {
 int main(int argc, char **argv) {
     int n = parse_x(argc, argv);
 
+    // Caso n <= 0 (coerente con Python)
     if (n <= 0) {
         printf("0\n");
-        return 0;
-    }
-
-    if (n == 1) {
-        printf("1\n");
         return 0;
     }
 
     long long a = 0;
     long long b = 1;
 
+    // Stampa iniziale
+    printf("0");
+
+    if (n >= 1) {
+        printf(", 1");
+    }
+
     for (int i = 2; i <= n; i++) {
         long long c = a + b;
+        printf(", %lld", c);
         a = b;
         b = c;
     }
 
-    printf("%lld\n", b);
+    printf("\n");
     return 0;
 }
