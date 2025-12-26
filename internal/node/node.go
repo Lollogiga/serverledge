@@ -3,12 +3,13 @@ package node
 import (
 	"errors"
 	"fmt"
-	"github.com/lithammer/shortuuid"
-	"github.com/serverledge-faas/serverledge/internal/config"
 	"runtime"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/lithammer/shortuuid"
+	"github.com/serverledge-faas/serverledge/internal/config"
 )
 
 var OutOfResourcesErr = errors.New("not enough resources for function execution")
@@ -42,7 +43,7 @@ type Resources struct {
 func (n *Resources) Init() {
 	availableCores := runtime.NumCPU()
 	n.totalCPUs = config.GetFloat(config.POOL_CPUS, float64(availableCores))
-	n.totalMemory = int64(config.GetInt(config.POOL_MEMORY_MB, 1024))
+	n.totalMemory = int64(config.GetInt(config.POOL_MEMORY_MB, 4096))
 	n.containerPools = make(map[string]*ContainerPool)
 }
 

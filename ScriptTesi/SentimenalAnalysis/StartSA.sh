@@ -46,9 +46,9 @@ log_ok "Serverledge functions cleanup completed"
 
 
 # =====================================================
-# CREAZIONE FUNZIONE FIBONACCI (C / native)
+# CREAZIONE FUNZIONE SENTIMETALANALYSIS LIGHT
 # =====================================================
-log_info "Creating SentimentalAnalysis function (light, medium, heavy)"
+log_info "Creating SentimentalAnalysis function (light, heavy)"
 
 $SERVERLEDGE create \
   --function SALight \
@@ -57,27 +57,13 @@ $SERVERLEDGE create \
   --handler SALight.handler \
   --input "text:Text" \
   --output "label:Text,confidence:Float" \
-  --memory 256
+  --memory 2048
 
 
 log_ok "Function SAlight created"
 
 # =====================================================
-# CREAZIONE FUNZIONE FIBONACCI (python)
-# =====================================================
-$SERVERLEDGE create \
-  --function SAMedium \
-  --runtime python-ml \
-  --src ../../examples/Tesi/SentimentAnalysis/SAMedium.py \
-  --handler SAMedium.handler \
-  --input "text:Text" \
-  --output "label:Text,confidence:Float" \
-  --memory 256
-
-log_ok "Function SAMedium created"
-
-# =====================================================
-# CREAZIONE FUNZIONE FIBONACCI BINET (python)
+# CREAZIONE FUNZIONE SENTIMETALANALYSIS HEAVY
 # =====================================================
 $SERVERLEDGE create \
   --function SAHeavy \
@@ -86,7 +72,7 @@ $SERVERLEDGE create \
   --handler SAHeavy.handler \
   --input "text:Text" \
   --output "label:Text,confidence:Float" \
-  --memory 1024
+  --memory 2048
 
 log_ok "Function SAHeavy created"
 
