@@ -29,27 +29,15 @@ fi
 # INVOKE (ESECUZIONE)
 # =====================================================
 log_info "Invoking SALight"
-
 $SERVERLEDGE invoke \
   --function SALight \
-  --param text:"I really like this product"
-
-log_ok "Invocation completed"
-
-log_info "Invoking SAMedium"
-
-$SERVERLEDGE invoke \
-  --function SAMedium \
-  --param text:"I really like this product"
-
+  --param text:"Looks good but it works terribly"
 log_ok "Invocation completed"
 
 log_info "Invoking SAHeavy-py"
-
 $SERVERLEDGE invoke \
   --function SAHeavy \
-  --param text:"I really like this product"
-
+  --param text:"Looks good but it works terribly"
 log_ok "Invocation completed"
 
 # =====================================================

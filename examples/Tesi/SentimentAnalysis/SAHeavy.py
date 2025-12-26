@@ -1,13 +1,13 @@
 from transformers import pipeline
 
-def handler(params, context):
-    text = params["text"]
-
-    classifier = pipeline(
+classifier = pipeline(
         "sentiment-analysis",
-        model="bert-large-uncased",
+        model="siebert/sentiment-roberta-large-english",
         device=-1
     )
+
+def handler(params, context):
+    text = params["text"]
 
     result = classifier(text)[0]
 
