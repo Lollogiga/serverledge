@@ -31,13 +31,13 @@ fi
 log_info "Invoking SALight"
 $SERVERLEDGE invoke \
   --function SALight \
-  --param text:"Looks good but it works terribly"
+  --param text:"Good another bad item"
 log_ok "Invocation completed"
 
 log_info "Invoking SAHeavy-py"
 $SERVERLEDGE invoke \
   --function SAHeavy \
-  --param text:"Looks good but it works terribly"
+  --param text:"Good another bad item"
 log_ok "Invocation completed"
 
 # =====================================================
