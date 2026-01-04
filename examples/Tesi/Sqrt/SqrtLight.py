@@ -1,22 +1,16 @@
 def handler(params, context):
-    n = float(params["n"])
+    n_float = float(params["n"])
 
-    if n < 0:
-        return {"error": "sqrt not defined for negative numbers"}
+    if n_float < 0:
+        return {"error": "err"} # Messaggio breve per risparmiare byte
+
+    n = int(n_float)
 
     if n == 0:
-        return {
-            "value": 0.0,
-        }
+        return {"value": 0}
 
-    # Numero di iterazioni scelto per garantire errore relativo ~1e-6
-    ITERATIONS = 5
-
-    x = n / 2.0
-
-    for _ in range(ITERATIONS):
-        x = 0.5 * (x + n / x)
+    result = 1 << (n.bit_length() >> 1)
 
     return {
-        "value": x,
+        "value": result,
     }

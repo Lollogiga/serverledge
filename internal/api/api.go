@@ -177,6 +177,16 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		f.MaxConcurrency = 1
 	}
 
+	//Generate/Load function's variants
+	if f.IsApproximate {
+		variants, err := function.LoadVariantsFromFile(&f)
+		if err != nil {
+			log.Printf("Failed loading variants for %s: %v\n", f.Name, err)
+			return c.JSON(http.StatusBadRequest, err.Error())
+		}
+		f.Variants = variants
+	}
+
 	err = f.SaveToEtcd()
 	if err != nil {
 		log.Printf("Failed creation: %v\n", err)

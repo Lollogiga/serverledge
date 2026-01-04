@@ -1,0 +1,26 @@
+{
+  "variants": [
+    {
+      "id": "Sqrt",
+      "runtime": "python310",
+      "entry_point": "Sqrt.handler",
+      "energy": {
+        "cold_start_joule": 0.039147368,
+        "invocation_joule": 0.000452632
+      },
+      "error_estimate": 0.0,
+      "is_approximate": false
+    },
+    {
+      "id": "SqrtLight",
+      "runtime": "python310",
+      "entry_point": "SqrtLight.handler",
+      "energy": {
+        "cold_start_joule": 0.034963158,
+        "invocation_joule": 0.000336842
+      },
+      "error_estimate": 0.04266,
+      "is_approximate": true
+    }
+  ]
+}

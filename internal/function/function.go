@@ -23,6 +23,10 @@ type Function struct {
 	TarFunctionCode string  // input is .tar
 	CustomImage     string  // used if custom runtime is chosen
 	Signature       *Signature
+
+	IsApproximate bool `json:"is_approximate"`
+	// Variants represents alternative implementations of this function
+	Variants []Variant `json:"variants,omitempty"`
 }
 
 func (f *Function) getEtcdKey() string {

@@ -12,7 +12,7 @@ VAL_X=3310.12
 VAL_Y=443212.1
 
 # =====================================================
-# SINGLE INVOKE LIGHT
+#INVOKE LIGHT
 # =====================================================
 
 log_info "Invoking VectorMagnitudeLight-py (x=${VAL_X}, y=${VAL_Y})"
@@ -25,7 +25,7 @@ echo "" # Spaziatura output
 log_ok "Light version executed"
 
 # =====================================================
-# SINGLE INVOKE BASE
+# INVOKE BASE
 # =====================================================
 
 log_info "Invoking VectorMagnitude-py (x=${VAL_X}, y=${VAL_Y})"
@@ -36,5 +36,3 @@ $SERVERLEDGE invoke \
 
 echo "" # Spaziatura output
 log_ok "Base version executed"
-
-sleep 2

@@ -1,0 +1,26 @@
+{
+  "variants": [
+    {
+      "id": "VectorMagnitude",
+      "runtime": "python310",
+      "entry_point": "VectorMagnitude.handler",
+      "energy": {
+        "cold_start_joule": 0.106473674,
+        "invocation_joule": 0.000526316
+      },
+      "error_estimate": 0.0,
+      "is_approximate": false
+    },
+    {
+      "id": "VectorMagnitudeLight",
+      "runtime": "python310",
+      "entry_point": "VectorMagnitudeLight.handler",
+      "energy": {
+        "cold_start_joule": 0.100578947,
+        "invocation_joule": 0.000421053
+      },
+      "error_estimate": 0.04,
+      "is_approximate": true
+    }
+  ]
+}

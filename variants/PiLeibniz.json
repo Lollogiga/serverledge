@@ -1,0 +1,37 @@
+{
+  "variants": [
+    {
+      "id": "piLeibniz-py",
+      "runtime": "python310",
+      "entry_point": "piLeibniz.handler",
+      "energy": {
+        "cold_start_joule": 0.069905000,
+        "invocation_joule": 0.001194734
+      },
+      "error_estimate": 0.0,
+      "is_approximate": false
+    },
+    {
+      "id": "piLeibniz_o-py",
+      "runtime": "python310",
+      "entry_point": "fibonacci_o.handler",
+      "energy": {
+        "cold_start_joule": 0.069710526,
+        "invocation_joule": 0.001189474
+      },
+      "error_estimate": 1.99960008e-8,
+      "is_approximate": true
+    },
+    {
+      "id": "piLeibniz-c",
+      "runtime": "native",
+      "entry_point": "fibonacci",
+      "energy": {
+        "cold_start_joule": 0.008652632,
+        "invocation_joule": 0.000207368
+      },
+      "error_estimate": 0.00,
+      "is_approximate": false
+    }
+  ]
+}

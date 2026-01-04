@@ -1,0 +1,26 @@
+{
+  "variants": [
+    {
+      "id": "SAHeavy",
+      "runtime": "python-ml",
+      "entry_point": "SAHeavy.handler",
+      "energy": {
+        "cold_start_joule": 7.04821530,
+        "invocation_joule": 0.091578947
+      },
+      "quality": "High",
+      "is_approximate": false
+    },
+    {
+      "id": "ImageClassificationLight",
+      "runtime": "python-ml",
+      "entry_point": "ImageClassificationLight.handler",
+      "energy": {
+        "cold_start_joule": 2.377368421,
+        "invocation_joule": 0.072631579
+      },
+      "quality": "Low",
+      "is_approximate": true
+    }
+  ]
+}
