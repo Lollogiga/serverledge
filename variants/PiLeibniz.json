@@ -8,7 +8,10 @@
         "cold_start_joule": 0.069905000,
         "invocation_joule": 0.001194734
       },
-      "error_estimate": 0.0,
+      "output":{
+        "type": "error",
+        "error_estimate:": 0.0
+      },
       "is_approximate": false
     },
     {
@@ -19,7 +22,10 @@
         "cold_start_joule": 0.069710526,
         "invocation_joule": 0.001189474
       },
-      "error_estimate": 1.99960008e-8,
+      "output":{
+        "type": "error",
+        "error_estimate:": 1.99960008e-8
+      },
       "is_approximate": true
     },
     {
@@ -30,7 +36,10 @@
         "cold_start_joule": 0.008652632,
         "invocation_joule": 0.000207368
       },
-      "error_estimate": 0.00,
+      "output":{
+        "type": "error",
+        "error_estimate:": 0.0
+      },
       "is_approximate": false
     }
   ]

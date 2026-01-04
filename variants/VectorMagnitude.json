@@ -8,7 +8,10 @@
         "cold_start_joule": 0.106473674,
         "invocation_joule": 0.000526316
       },
-      "error_estimate": 0.0,
+      "output":{
+        "type": "error",
+        "error_estimate:": 0.0
+      },
       "is_approximate": false
     },
     {
@@ -19,7 +22,10 @@
         "cold_start_joule": 0.100578947,
         "invocation_joule": 0.000421053
       },
-      "error_estimate": 0.04,
+      "output":{
+        "type": "error",
+        "error_estimate:": 0.04
+      },
       "is_approximate": true
     }
   ]

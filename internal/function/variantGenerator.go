@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/serverledge-faas/serverledge/internal/variant"
 )
 
-func LoadVariantsFromFile(fn *Function) ([]Variant, error) {
+func LoadVariantsFromFile(fn *Function) ([]variant.Variant, error) {
 	// TODO: path hardcoded solo per ora
 	path := "variants.json"
 
@@ -15,7 +17,7 @@ func LoadVariantsFromFile(fn *Function) ([]Variant, error) {
 		return nil, fmt.Errorf("cannot read variants file: %w", err)
 	}
 
-	var variants []Variant
+	var variants []variant.Variant
 	if err := json.Unmarshal(data, &variants); err != nil {
 		return nil, fmt.Errorf("invalid variants file: %w", err)
 	}

@@ -3,10 +3,10 @@ package function
 import (
 	"encoding/json"
 	"fmt"
-
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/cache"
+	"github.com/serverledge-faas/serverledge/internal/variant"
 	"github.com/serverledge-faas/serverledge/utils"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"golang.org/x/net/context"
@@ -26,7 +26,7 @@ type Function struct {
 
 	IsApproximate bool `json:"is_approximate"`
 	// Variants represents alternative implementations of this function
-	Variants []Variant `json:"variants,omitempty"`
+	Variants []variant.Variant
 }
 
 func (f *Function) getEtcdKey() string {

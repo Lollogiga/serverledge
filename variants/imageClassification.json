@@ -8,7 +8,10 @@
         "cold_start_joule": 1.894736842,
         "invocation_joule": 1.455263158
       },
-      "quality": "High",
+      "output":{
+        "type": "quality",
+        "quality:": "High"
+      },
       "is_approximate": false
     },
     {
@@ -19,7 +22,10 @@
         "cold_start_joule": 1.071052329,
         "invocation_joule": 0.22894768
       },
-      "quality": "Low",
+      "output":{
+        "type": "quality",
+        "quality:": "High"
+      },
       "is_approximate": true
     }
   ]
