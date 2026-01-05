@@ -16,6 +16,10 @@ type Variant struct {
 	Runtime    string `json:"runtime"`
 	EntryPoint string `json:"entry_point"`
 
+	Src string `json:"src"`
+
+	TarCode string `json:"-"`
+
 	Energy EnergyProfile `json:"energy"`
 	Output OutputModel   `json:"output"`
 

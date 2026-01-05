@@ -236,6 +236,16 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		}
 
 		fn.Variants = merged
+
+		// ------------------------------------------------------------------
+		// 6. Materialize internal variant functions
+		// ------------------------------------------------------------------
+		if fn.AllowApprox && len(fn.Variants) > 0 {
+			if err := variants.CreateInternalVariants(ctx, fn); err != nil {
+				log.Printf("Failed creating internal variants: %v\n", err)
+				return c.String(http.StatusInternalServerError, err.Error())
+			}
+		}
 	}
 
 	log.Println("Persist function to Etcd")
