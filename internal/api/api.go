@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/node"
 	"github.com/serverledge-faas/serverledge/internal/registration"
 	"github.com/serverledge-faas/serverledge/internal/telemetry"
+	"github.com/serverledge-faas/serverledge/internal/variants"
 	"github.com/serverledge-faas/serverledge/internal/workflow"
 	"github.com/serverledge-faas/serverledge/utils"
 	"go.opentelemetry.io/otel/attribute"
@@ -133,66 +135,128 @@ func PollAsyncResult(c echo.Context) error {
 
 // CreateOrUpdateFunction handles a function creation/update request.
 func CreateOrUpdateFunction(c echo.Context) error {
+
+	log.Println("Parse Request")
+	// ------------------------------------------------------------------
+	// 1. Parse request
+	// ------------------------------------------------------------------
 	var f function.Function
-	err := json.NewDecoder(c.Request().Body).Decode(&f)
-	if err != nil && err != io.EOF {
+	if err := json.NewDecoder(c.Request().Body).Decode(&f); err != nil && err != io.EOF {
 		log.Printf("Could not parse request: %v\n", err)
-		return err
+		return c.String(http.StatusBadRequest, "Invalid request body")
 	}
 
+	fn := &f
+	ctx := c.Request().Context()
+
+	log.Println("Create/Update Function")
+	// ------------------------------------------------------------------
+	// 2. Create vs Update check
+	// ------------------------------------------------------------------
 	if c.Path() != "/update" {
-		_, ok := function.GetFunction(f.Name) // TODO: we would need a system-wide lock here...
-		if ok {
-			log.Printf("Dropping request for already existing function '%s'\n", f.Name)
-			return c.String(http.StatusConflict, "")
+		if _, ok := function.GetFunction(fn.Name); ok {
+			log.Printf("Function '%s' already exists\n", fn.Name)
+			return c.String(http.StatusConflict, "Function already exists")
 		}
-
-		log.Printf("New request: creation of %s\n", f.Name)
+		log.Printf("Creating function %s\n", fn.Name)
 	} else {
-		log.Printf("New request: creation/update of %s\n", f.Name)
+		log.Printf("Creating/updating function %s\n", fn.Name)
 	}
 
-	// Check that the selected runtime exists
-	if f.Runtime != container.CUSTOM_RUNTIME {
-		runtime, ok := container.RuntimeToInfo[f.Runtime]
-		if !ok {
-			return c.JSON(http.StatusNotFound, "Invalid runtime.")
-		}
-		if f.MaxConcurrency > 1 && !runtime.ConcurrencySupported {
-			log.Printf("Forcing max concurrency = 1 for runtime %s\n", f.Runtime)
-			f.MaxConcurrency = 1
-		}
-	} else {
-		if f.MaxConcurrency > 1 {
-			log.Printf("Forcing max concurrency = 1 for runtime %s\n", f.Runtime)
-			f.MaxConcurrency = 1
-		}
+	log.Println("Basic sanity checks")
+	// ------------------------------------------------------------------
+	// 3. Basic sanity checks (BASE FUNCTION ONLY)
+	// ------------------------------------------------------------------
+	if fn.Name == "" {
+		return c.String(http.StatusUnprocessableEntity, "Function name is required")
 	}
 
-	if f.MemoryMB < 1 {
+	if fn.MemoryMB < 1 {
 		return c.String(http.StatusUnprocessableEntity, "Invalid memory limit")
 	}
 
-	if f.MaxConcurrency <= 0 {
-		f.MaxConcurrency = 1
+	if fn.MaxConcurrency <= 0 {
+		fn.MaxConcurrency = 1
 	}
 
-	//Generate/Load function's variants
-	if f.IsApproximate {
-		variants, err := function.LoadVariantsFromFile(&f)
-		if err != nil {
-			log.Printf("Failed loading variants for %s: %v\n", f.Name, err)
-			return c.JSON(http.StatusBadRequest, err.Error())
+	// ------------------------------------------------------------------
+	// 4. Validate BASE runtime only
+	// ------------------------------------------------------------------
+	if fn.Runtime != container.CUSTOM_RUNTIME {
+		runtime, ok := container.RuntimeToInfo[fn.Runtime]
+		if !ok {
+			return c.String(http.StatusNotFound, "Invalid runtime")
 		}
-		f.Variants = variants
+		if fn.MaxConcurrency > 1 && !runtime.ConcurrencySupported {
+			log.Printf("Forcing max concurrency = 1 for runtime %s\n", fn.Runtime)
+			fn.MaxConcurrency = 1
+		}
+	} else {
+		if fn.MaxConcurrency > 1 {
+			log.Printf("Forcing max concurrency = 1 for custom runtime\n")
+			fn.MaxConcurrency = 1
+		}
 	}
 
-	err = f.SaveToEtcd()
-	if err != nil {
-		log.Printf("Failed creation: %v\n", err)
-		return c.JSON(http.StatusServiceUnavailable, "")
+	// ------------------------------------------------------------------
+	// 5. OPTIONAL: load/generate variants ONLY if AllowApprox == true
+	// ------------------------------------------------------------------
+	if fn.AllowApprox {
+		log.Println("AllowApprox enabled: loading/generating variants")
+
+		variantsDir := os.Getenv("SERVERLEDGE_VARIANTS_DIR")
+		if variantsDir == "" {
+			variantsDir = "variants"
+		}
+
+		variantFactory := &variants.Factory{
+			FileSource: &variants.FileSource{
+				BaseDir: variantsDir,
+			},
+			GeneratorSource: &variants.GeneratorSource{}, // stub / future
+		}
+
+		source, err := variantFactory.GetSource(fn)
+		if err != nil {
+			log.Printf("No variant source available: %v\n", err)
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+
+		loadedVariants, err := source.Load(ctx, fn)
+		if err != nil {
+			log.Printf("Failed loading variants: %v\n", err)
+			return c.String(http.StatusNotFound, err.Error())
+		}
+
+		// Merge base (implicit) + loaded variants
+		merged, err := variants.MergeAndValidate(nil, loadedVariants)
+		if err != nil {
+			log.Printf("Variant merge failed: %v\n", err)
+			return c.String(http.StatusUnprocessableEntity, err.Error())
+		}
+
+		fn.Variants = merged
 	}
-	response := struct{ Created string }{f.Name}
+
+	log.Println("Persist function to Etcd")
+	// ------------------------------------------------------------------
+	// 6. Persist function to Etcd
+	// ------------------------------------------------------------------
+	if err := fn.SaveToEtcd(); err != nil {
+		log.Printf("Failed to save function: %v\n", err)
+		return c.String(http.StatusServiceUnavailable, "Failed to save function")
+	}
+
+	log.Println("Create Response")
+	// ------------------------------------------------------------------
+	// 7. Response
+	// ------------------------------------------------------------------
+	response := struct {
+		Created string `json:"created"`
+	}{
+		Created: fn.Name,
+	}
+
 	return c.JSON(http.StatusOK, response)
 }
 

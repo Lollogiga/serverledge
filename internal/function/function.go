@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/cache"
-	"github.com/serverledge-faas/serverledge/internal/variant"
 	"github.com/serverledge-faas/serverledge/utils"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"golang.org/x/net/context"
@@ -24,9 +23,10 @@ type Function struct {
 	CustomImage     string  // used if custom runtime is chosen
 	Signature       *Signature
 
-	IsApproximate bool `json:"is_approximate"`
-	// Variants represents alternative implementations of this function
-	Variants []variant.Variant
+	//New parameters for variant
+	Variants          []Variant
+	AllowApprox       bool
+	VariantsProfileID string
 }
 
 func (f *Function) getEtcdKey() string {

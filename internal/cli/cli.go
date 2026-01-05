@@ -110,7 +110,8 @@ var update bool
 var maxConcurrency int16
 var prewarmCount int64
 var forcePull bool
-var isApproximate bool
+var allowApprox bool
+var variantsProfileID string
 
 func Init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
@@ -174,11 +175,19 @@ func Init() {
 	rootCmd.AddCommand(compListCmd)
 
 	createCmd.Flags().BoolVar(
-		&isApproximate,
+		&allowApprox,
 		"approximate",
 		false,
 		"Allow generation and usage of approximate variants for this function",
 	)
+
+	createCmd.Flags().StringVar(
+		&variantsProfileID,
+		"variants-profile-id",
+		"",
+		"Optional variants profile ID (defaults to function name)",
+	)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -372,8 +381,10 @@ func create(cmd *cobra.Command, args []string) {
 		CustomImage:     customImage,
 		Signature:       sig,
 
-		IsApproximate: isApproximate,
+		AllowApprox:       allowApprox,
+		VariantsProfileID: variantsProfileID,
 	}
+
 	requestBody, err := json.Marshal(request)
 	if err != nil {
 		showHelpAndExit(cmd)
