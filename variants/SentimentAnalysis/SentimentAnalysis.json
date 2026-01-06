@@ -1,0 +1,34 @@
+{
+  "variants": [
+    {
+      "id": "Base",
+      "runtime": "python-ml",
+      "entry_point": "SAHeavy.handler",
+      "src": "SAHeavy.py",
+      "energy": {
+        "cold_start_joule": 7.04821530,
+        "invocation_joule": 0.091578947
+      },
+      "output":{
+        "type": "quality",
+        "quality:": "High"
+      },
+      "is_approximate": false
+    },
+    {
+      "id": "Light",
+      "runtime": "python-ml",
+      "entry_point": "SALight.handler",
+      "src": "SALight.py",
+      "energy": {
+        "cold_start_joule": 2.377368421,
+        "invocation_joule": 0.072631579
+      },
+      "output":{
+        "type": "quality",
+        "quality:": "Low"
+      },
+      "is_approximate": true
+    }
+  ]
+}

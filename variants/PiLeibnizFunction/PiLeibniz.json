@@ -3,11 +3,11 @@
     {
       "id": "base-py",
       "runtime": "python310",
-      "entry_point": "fibonacci.handler",
-      "src": "fibonacci.py",
+      "entry_point": "piLeibniz.handler",
+      "src": "piLeibniz.py",
       "energy": {
-        "cold_start_joule": 0.06606,
-        "invocation_joule": 0.000731579
+        "cold_start_joule": 0.069905000,
+        "invocation_joule": 0.001194734
       },
       "output":{
         "type": "error",
@@ -19,25 +19,25 @@
       "id": "optimization-py",
       "runtime": "python310",
       "entry_point": "fibonacci_o.handler",
-      "src": "fibonacci_o.py",
+      "src": "piLeibniz_o.py",
       "energy": {
-        "cold_start_joule": 0.05640,
-        "invocation_joule": 0.000494737
+        "cold_start_joule": 0.069710526,
+        "invocation_joule": 0.001189474
       },
       "output":{
         "type": "error",
-        "error_estimate:": 0.0
+        "error_estimate:": 1.99960008e-8
       },
-      "is_approximate": false
+      "is_approximate": true
     },
     {
       "id": "c",
       "runtime": "native",
       "entry_point": "fibonacci",
-      "src": "fibonacci",
+      "src": "piLeibniz",
       "energy": {
-        "cold_start_joule": 0.008268422,
-        "invocation_joule": 0.000171579
+        "cold_start_joule": 0.008652632,
+        "invocation_joule": 0.000207368
       },
       "output":{
         "type": "error",

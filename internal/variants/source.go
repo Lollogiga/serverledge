@@ -9,4 +9,5 @@ import (
 type Source interface {
 	Type() string
 	Load(ctx context.Context, fn *function.Function) ([]function.Variant, error)
+	Exists(profile string) bool
 }

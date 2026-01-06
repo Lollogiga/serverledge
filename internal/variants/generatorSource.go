@@ -9,6 +9,11 @@ import (
 
 type GeneratorSource struct{}
 
+func (g *GeneratorSource) Exists(profile string) bool {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (g *GeneratorSource) Type() string {
 	return "generator"
 }

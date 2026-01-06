@@ -179,6 +179,10 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		fn.MaxConcurrency = 1
 	}
 
+	if fn.VariantsProfileID == "" {
+		fn.VariantsProfileID = fn.Name
+	}
+
 	// ------------------------------------------------------------------
 	// 4. Validate BASE runtime only
 	// ------------------------------------------------------------------

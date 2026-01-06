@@ -13,15 +13,16 @@ type Factory struct {
 
 func (f *Factory) GetSource(fn *function.Function) (Source, error) {
 
-	// Caso esplicito: profilo varianti definito
-	if fn.VariantsProfileID != "" {
+	// 1. Caso deterministico: profilo su file
+	if f.FileSource != nil && f.FileSource.Exists(fn.VariantsProfileID) {
 		return f.FileSource, nil
 	}
 
-	// Caso future-proof: approx ma senza file
+	// 2. Caso future-proof: generazione automatica
 	if fn.AllowApprox && f.GeneratorSource != nil {
 		return f.GeneratorSource, nil
 	}
 
+	// 3. Nessuna sorgente disponibile
 	return nil, errors.New("no variant source available")
 }

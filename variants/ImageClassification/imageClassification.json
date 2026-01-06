@@ -1,0 +1,34 @@
+{
+  "variants": [
+    {
+      "id": "Base",
+      "runtime": "python-ml",
+      "entry_point": "ImageClassification.handler",
+      "src": "ImageClassification.py",
+      "energy": {
+        "cold_start_joule": 1.894736842,
+        "invocation_joule": 1.455263158
+      },
+      "output":{
+        "type": "quality",
+        "quality:": "High"
+      },
+      "is_approximate": false
+    },
+    {
+      "id": "Light",
+      "runtime": "python-ml",
+      "entry_point": "ImageClassificationLight.handler",
+      "src": "ImageClassificationLight.py",
+      "energy": {
+        "cold_start_joule": 1.071052329,
+        "invocation_joule": 0.22894768
+      },
+      "output":{
+        "type": "quality",
+        "quality:": "High"
+      },
+      "is_approximate": true
+    }
+  ]
+}
