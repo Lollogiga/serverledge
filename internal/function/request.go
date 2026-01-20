@@ -16,6 +16,9 @@ type Request struct {
 	CanDoOffloading bool
 	Async           bool
 	ReturnOutput    bool
+
+	AllowApprox    bool
+	MaxEnergyJoule *float64
 }
 
 type RequestQoS struct {

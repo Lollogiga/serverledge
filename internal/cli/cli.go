@@ -112,6 +112,7 @@ var prewarmCount int64
 var forcePull bool
 var allowApprox bool
 var variantsProfileID string
+var maxEnergy float64
 
 func Init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
@@ -126,6 +127,19 @@ func Init() {
 	invokeCmd.Flags().StringVarP(&paramsFile, "params_file", "j", "", "File containing parameters (JSON)")
 	invokeCmd.Flags().BoolVarP(&asyncInvocation, "async", "a", false, "Asynchronous invocation")
 	invokeCmd.Flags().BoolVarP(&returnOutput, "ret_output", "o", false, "Capture function output (if supported by used runtime)")
+	invokeCmd.Flags().BoolVar(
+		&allowApprox,
+		"allowApprox",
+		false,
+		"Allow execution of approximate variants (energy-aware scheduling)",
+	)
+
+	invokeCmd.Flags().Float64Var(
+		&maxEnergy,
+		"maxEnergy",
+		0.0,
+		"Maximum energy budget in Joules (used only if --allow-approx is set)",
+	)
 
 	rootCmd.AddCommand(createCmd)
 	createCmd.Flags().BoolVarP(&update, "update", "u", false, "Overwrite any function with the same name")
@@ -243,7 +257,10 @@ func invoke(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 	}
-
+	var maxEnergyPtr *float64
+	if cmd.Flags().Changed("max-energy") {
+		maxEnergyPtr = &maxEnergy
+	}
 	// Prepare request
 	request := client.InvocationRequest{
 		Params:          paramsMap,
@@ -251,7 +268,11 @@ func invoke(cmd *cobra.Command, args []string) {
 		QoSMaxRespT:     qosMaxRespT,
 		CanDoOffloading: true,
 		ReturnOutput:    returnOutput,
-		Async:           asyncInvocation}
+		Async:           asyncInvocation,
+
+		AllowApprox:    allowApprox,
+		MaxEnergyJoule: maxEnergyPtr,
+	}
 	invocationBody, err := json.Marshal(request)
 	if err != nil {
 		showHelpAndExit(cmd)

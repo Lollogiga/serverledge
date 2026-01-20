@@ -12,6 +12,10 @@ type InvocationRequest struct {
 	CanDoOffloading bool
 	Async           bool
 	ReturnOutput    bool
+
+	//New fields
+	AllowApprox    bool     `json:"allowApprox"`
+	MaxEnergyJoule *float64 `json:"maxEnergyJoule,omitempty"`
 }
 
 type PrewarmingRequest struct {

@@ -5,6 +5,7 @@ go 1.24
 require (
 	github.com/buger/jsonparser v1.1.1
 	github.com/docker/docker v24.0.5+incompatible
+	github.com/google/uuid v1.6.0
 	github.com/hexablock/vivaldi v0.0.0-20180727225019-07adad3f2b5f
 	github.com/labstack/echo/v4 v4.6.1
 	github.com/labstack/gommon v0.3.0
@@ -40,7 +41,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
