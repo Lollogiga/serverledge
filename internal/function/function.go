@@ -3,6 +3,7 @@ package function
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/cache"
@@ -102,19 +103,33 @@ func (f *Function) SaveToEtcd() error {
 	if err != nil {
 		return err
 	}
-	ctx := context.TODO()
 
-	payload, err := json.Marshal(*f)
+	ctx := context.Background()
+
+	// 1. salva la funzione vera
+	key := fmt.Sprintf("/function/%s", f.Name)
+
+	data, err := json.Marshal(f)
 	if err != nil {
-		return fmt.Errorf("Could not marshal function: %v", err)
-	}
-	_, err = cli.Put(ctx, f.getEtcdKey(), string(payload))
-	if err != nil {
-		return fmt.Errorf("Failed Put: %v", err)
+		return err
 	}
 
-	// Add the function to the local cache
-	cache.GetCacheInstance().Set(f.Name, f, cache.DefaultExp)
+	if _, err := cli.Put(ctx, key, string(data)); err != nil {
+		return err
+	}
+
+	// 2️. aggiorna indice logico (SE esiste)
+	if f.LogicalName != "" {
+		indexKey := fmt.Sprintf(
+			"/index/logical/%s/%s",
+			f.LogicalName,
+			f.Name,
+		)
+
+		if _, err := cli.Put(ctx, indexKey, ""); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -132,6 +147,14 @@ func (f *Function) Delete() error {
 		return fmt.Errorf("Failed Delete: %v", err)
 	} else if dresp.Deleted != 1 {
 		fmt.Printf("no function with key '%s' exists", f.getEtcdKey())
+	}
+
+	if f.LogicalName != "" {
+		cli.Delete(ctx,
+			fmt.Sprintf("/index/logical/%s/%s",
+				f.LogicalName,
+				f.Name),
+		)
 	}
 
 	// Remove the function from the local cache
@@ -181,4 +204,39 @@ func GetAllWithPrefix(prefix string) ([]string, error) {
 	}
 
 	return functions, ctx.Err()
+}
+
+func logicalIndexKey(logical, name string) string {
+	return fmt.Sprintf("/index/logical/%s/%s", logical, name)
+}
+
+func GetFunctionsByLogicalName(logical string) ([]*Function, error) {
+	cli, err := utils.GetEtcdClient()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := context.Background()
+
+	prefix := fmt.Sprintf("/index/logical/%s/", logical)
+
+	resp, err := cli.Get(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*Function
+
+	for _, kv := range resp.Kvs {
+		// estrai nome funzione dall'ultima parte della key
+		parts := strings.Split(string(kv.Key), "/")
+		name := parts[len(parts)-1]
+
+		f, ok := GetFunction(name)
+		if ok {
+			result = append(result, f)
+		}
+	}
+
+	return result, nil
 }
