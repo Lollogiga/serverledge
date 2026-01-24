@@ -2,7 +2,6 @@ package scheduling
 
 import (
 	"fmt"
-	"github.com/serverledge-faas/serverledge/internal/registration"
 	"log"
 	"net/http"
 	"time"
@@ -11,8 +10,8 @@ import (
 	"github.com/serverledge-faas/serverledge/internal/function"
 	"github.com/serverledge-faas/serverledge/internal/metrics"
 	"github.com/serverledge-faas/serverledge/internal/node"
+	"github.com/serverledge-faas/serverledge/internal/registration"
 	"github.com/serverledge-faas/serverledge/internal/telemetry"
-
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -74,36 +73,74 @@ func Run(p Policy) {
 
 // SubmitRequest submits a newly arrived request for scheduling and execution
 func SubmitRequest(r *function.Request) (*function.ExecutionReport, error) {
+
+	// =====================================================
+	// Inizializzazione scheduledRequest
+	// =====================================================
 	schedRequest := scheduledRequest{
 		Request:         r,
 		ExecutionReport: &function.ExecutionReport{},
-		decisionChannel: make(chan schedDecision, 1)}
+		decisionChannel: make(chan schedDecision, 1),
+	}
+
+	// =====================================================
+	// Energy-aware variant selection (OPT-IN)
+	// =====================================================
+	if r != nil && r.AllowApprox {
+
+		selectedFn, schedReport, err := SelectEnergyAwareVariant(r)
+
+		// Logghiamo SEMPRE il report di scheduling
+		schedRequest.ExecutionReport.VariantSchedulingReport = schedReport
+
+		if err != nil {
+			// Vincolo energetico NON soddisfatto
+			// → niente esecuzione, niente scheduling legacy
+			return nil, err
+		}
+
+		if selectedFn != nil {
+			r.Fun = selectedFn
+		}
+	}
+
+	// =====================================================
+	// Invio al loop di scheduling (legacy)
+	// =====================================================
 	requests <- &schedRequest
 
 	if telemetry.DefaultTracer != nil {
 		trace.SpanFromContext(r.Ctx).AddEvent("Scheduling start")
 	}
 
-	// wait on channel for scheduling action
+	// =====================================================
+	// Attesa decisione di scheduling
+	// =====================================================
 	schedDecision, ok := <-schedRequest.decisionChannel
 	if !ok {
 		return nil, fmt.Errorf("could not schedule the request")
 	}
-	//log.Printf("[%s] Scheduling decision: %v", r, schedDecision)
 
 	if telemetry.DefaultTracer != nil {
 		trace.SpanFromContext(r.Ctx).AddEvent("Scheduling complete")
 	}
 
+	// =====================================================
+	// Esecuzione / offload / drop
+	// =====================================================
 	if schedDecision.action == DROP {
-		//log.Printf("[%s] Dropping request", r)
 		return nil, node.OutOfResourcesErr
+
 	} else if schedDecision.action == EXEC_REMOTE {
-		//log.Printf("Offloading request")
 		err := Offload(&schedRequest, schedDecision.remoteHost)
 		return schedRequest.ExecutionReport, err
+
 	} else {
-		err := Execute(schedDecision.cont, &schedRequest, schedDecision.useWarm)
+		err := Execute(
+			schedDecision.cont,
+			&schedRequest,
+			schedDecision.useWarm,
+		)
 		return schedRequest.ExecutionReport, err
 	}
 }

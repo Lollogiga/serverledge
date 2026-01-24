@@ -2,6 +2,7 @@ package function
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -239,4 +240,52 @@ func GetFunctionsByLogicalName(logical string) ([]*Function, error) {
 	}
 
 	return result, nil
+}
+
+func DeleteLogicalFunction(name string) error {
+
+	// 1. Recupera la funzione richiesta
+	base, ok := GetFunction(name)
+	if !ok {
+		return errors.New("function not found")
+	}
+
+	logical := base.LogicalName
+
+	// Caso legacy: nessun logical name
+	if logical == "" {
+		return base.Delete()
+	}
+
+	// 2. Recupera tutte le funzioni tramite indice
+	variants, err := GetFunctionsByLogicalName(logical)
+	if err != nil {
+		return err
+	}
+
+	// 3. Elimina tutte le funzioni (base inclusa)
+	for _, fn := range variants {
+		if fn == nil {
+			continue
+		}
+		if err := fn.Delete(); err != nil {
+			return err
+		}
+	}
+
+	// 4. Pulizia di sicurezza dell’indice
+	return DeleteLogicalIndex(logical)
+}
+
+func DeleteLogicalIndex(logical string) error {
+	cli, err := utils.GetEtcdClient()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.TODO()
+	prefix := fmt.Sprintf("/index/logical/%s/", logical)
+
+	_, err = cli.Delete(ctx, prefix, clientv3.WithPrefix())
+	return err
 }

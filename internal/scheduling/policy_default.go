@@ -4,11 +4,9 @@ import (
 	"errors"
 	"log"
 
+	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
-	"github.com/serverledge-faas/serverledge/internal/variants"
-
-	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/node"
 )
 
@@ -76,20 +74,6 @@ func (p *DefaultLocalPolicy) OnCompletion(_ *function.Function, _ *function.Exec
 
 // OnArrival for default policy is executed every time a function is invoked, before invoking the function
 func (p *DefaultLocalPolicy) OnArrival(r *scheduledRequest) {
-
-	// ------------------------------------------------------------
-	// Energy-aware variant selection (JouleGuard-style)
-	// If no constraints are provided, legacy behavior is preserved
-	// ------------------------------------------------------------
-	selectedFun, err := variants.SelectVariantJouleGuard(
-		r.Fun,
-		r.AllowApprox,
-		r.MaxEnergyJoule,
-		false, // warm status unknown at arrival
-	)
-	if err == nil {
-		r.Fun = selectedFun
-	}
 
 	// ------------------------------------------------------------
 	// Legacy scheduling logic (unchanged)

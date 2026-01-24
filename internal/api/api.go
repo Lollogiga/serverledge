@@ -12,19 +12,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labstack/echo/v4"
+	"github.com/mikoim/go-loadavg"
 	"github.com/serverledge-faas/serverledge/internal/client"
 	"github.com/serverledge-faas/serverledge/internal/function"
 	"github.com/serverledge-faas/serverledge/internal/node"
 	"github.com/serverledge-faas/serverledge/internal/registration"
+	"github.com/serverledge-faas/serverledge/internal/scheduling"
 	"github.com/serverledge-faas/serverledge/internal/telemetry"
 	"github.com/serverledge-faas/serverledge/internal/variants"
 	"github.com/serverledge-faas/serverledge/internal/workflow"
 	"github.com/serverledge-faas/serverledge/utils"
 	"go.opentelemetry.io/otel/attribute"
-
-	"github.com/labstack/echo/v4"
-	"github.com/mikoim/go-loadavg"
-	"github.com/serverledge-faas/serverledge/internal/scheduling"
 )
 
 var requestsPool = sync.Pool{
@@ -51,21 +50,31 @@ func GetFunctions(c echo.Context) error {
 // InvokeFunction handles a function invocation request.
 func InvokeFunction(c echo.Context) error {
 	funcName := c.Param("fun")
+
+	// =====================================================
+	// 1. Lookup funzione
+	// =====================================================
 	fun, ok := function.GetFunction(funcName)
 	if !ok {
-		log.Printf("Dropping request for unknown fun '%s'\n", funcName)
+		log.Printf("Dropping request for unknown function '%s'\n", funcName)
 		return c.String(http.StatusNotFound, "Function unknown")
 	}
 
+	// =====================================================
+	// 2. Parse request body
+	// =====================================================
 	var invocationRequest client.InvocationRequest
-	err := json.NewDecoder(c.Request().Body).Decode(&invocationRequest)
-	if err != nil && err != io.EOF {
+	if err := json.NewDecoder(c.Request().Body).Decode(&invocationRequest); err != nil && err != io.EOF {
 		log.Printf("Could not parse request: %v\n", err)
-		return fmt.Errorf("could not parse request: %v", err)
+		return c.String(http.StatusBadRequest, "Invalid invocation request")
 	}
-	// gets a function.Request from the pool goroutine-safe cache.
-	r := requestsPool.Get().(*function.Request) // function.Request will be created if does not exists, otherwise removed from the pool
-	defer requestsPool.Put(r)                   // at the end of the function, the function.Request is added to the pool.
+
+	// =====================================================
+	// 3. Build internal request
+	// =====================================================
+	r := requestsPool.Get().(*function.Request)
+	defer requestsPool.Put(r)
+
 	r.Fun = fun
 	r.Params = invocationRequest.Params
 	r.Arrival = time.Now()
@@ -73,14 +82,23 @@ func InvokeFunction(c echo.Context) error {
 	r.CanDoOffloading = invocationRequest.CanDoOffloading
 	r.Async = invocationRequest.Async
 	r.ReturnOutput = invocationRequest.ReturnOutput
-	//Energy-aware invocation constrains
+
+	// Energy-aware fields
 	r.AllowApprox = invocationRequest.AllowApprox
 	r.MaxEnergyJoule = invocationRequest.MaxEnergyJoule
 
-	reqId := fmt.Sprintf("%s-%s%d", funcName, node.LocalNode.String()[len(node.LocalNode.String())-5:], r.Arrival.Nanosecond())
+	reqId := fmt.Sprintf(
+		"%s-%s-%d",
+		funcName,
+		node.LocalNode.String()[len(node.LocalNode.String())-5:],
+		r.Arrival.Nanosecond(),
+	)
+
 	r.Ctx = context.WithValue(context.Background(), "ReqId", reqId)
 
-	// Tracing
+	// =====================================================
+	// 4. Tracing
+	// =====================================================
 	if telemetry.DefaultTracer != nil {
 		ctx, span := telemetry.DefaultTracer.Start(r.Ctx, "invocation")
 		r.Ctx = ctx
@@ -88,21 +106,55 @@ func InvokeFunction(c echo.Context) error {
 		defer span.End()
 	}
 
+	// =====================================================
+	// 5. Async path
+	// =====================================================
 	if r.Async {
 		go scheduling.SubmitAsyncRequest(r)
 		return c.JSON(http.StatusOK, function.AsyncResponse{ReqId: r.Id()})
 	}
 
+	// =====================================================
+	// 6. Sync execution
+	// =====================================================
 	executionReport, err := scheduling.SubmitRequest(r)
+	if err != nil {
 
-	if errors.Is(err, node.OutOfResourcesErr) {
-		return c.String(http.StatusTooManyRequests, "")
-	} else if err != nil {
+		// Caso nodo saturo
+		if errors.Is(err, node.OutOfResourcesErr) {
+			return c.String(http.StatusTooManyRequests, "Node out of resources")
+		}
+
+		// Caso errore di policy energetica
+		if r.AllowApprox && r.MaxEnergyJoule != nil {
+
+			log.Printf("Invocation rejected by energy policy: %v\n", err)
+
+			// executionReport può essere nil
+			var schedReport *function.VariantSchedulingReport
+			if executionReport != nil {
+				schedReport = executionReport.VariantSchedulingReport
+			}
+
+			return c.JSON(http.StatusUnprocessableEntity, map[string]interface{}{
+				"success":            false,
+				"error":              err.Error(),
+				"variant_scheduling": schedReport,
+			})
+		}
+
+		// Errore interno generico
 		log.Printf("Invocation failed: %v\n", err)
-		return c.String(http.StatusInternalServerError, "Node has not enough resources")
-	} else {
-		return c.JSON(http.StatusOK, function.Response{Success: true, ExecutionReport: *executionReport})
+		return c.String(http.StatusInternalServerError, "Internal server error")
 	}
+
+	// =====================================================
+	// 7. Success
+	// =====================================================
+	return c.JSON(http.StatusOK, function.Response{
+		Success:         true,
+		ExecutionReport: *executionReport,
+	})
 }
 
 // PollAsyncResult checks for the result of an asynchronous invocation.
@@ -265,9 +317,14 @@ func DeleteFunction(c echo.Context) error {
 	}
 
 	log.Printf("New request: deleting %s\n", f.Name)
-	err = f.Delete()
+	err = function.DeleteLogicalFunction(f.Name)
 	if err != nil {
 		log.Printf("Failed deletion: %v\n", err)
+
+		if errors.Is(err, errors.New("function not found")) {
+			return c.String(http.StatusNotFound, "Unknown function")
+		}
+
 		return c.String(http.StatusServiceUnavailable, "")
 	}
 

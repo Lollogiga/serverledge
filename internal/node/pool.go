@@ -447,3 +447,32 @@ func PrewarmInstances(f *function.Function, count int64, forcePull bool) (int64,
 
 	return spawned, nil
 }
+
+// HasWarmContainer returns true if there is at least one warm container
+// that could be used for this function WITHOUT mutating any pool state.
+// This is meant to be used as a scheduling "hint" (energy estimation),
+// not to actually acquire the container.
+func HasWarmContainer(f *function.Function) bool {
+	LocalResources.Lock()
+	defer LocalResources.Unlock()
+
+	fp := GetContainerPool(f)
+
+	// 1) If MaxConcurrency > 1, a busy container might still accept new requests.
+	if f.MaxConcurrency > 1 {
+		for elem := fp.busy.Front(); elem != nil; elem = elem.Next() {
+			c := elem.Value.(*container.Container)
+			if c.RequestsCount < f.MaxConcurrency {
+				return true
+			}
+		}
+	}
+
+	// 2) Otherwise, we need an idle container. BUT: a warm container still needs CPU
+	// to be (re)started/used (mirrors acquireWarmContainer checks).
+	if fp.idle.Front() == nil {
+		return false
+	}
+
+	return LocalResources.AvailableCPUs() >= f.CPUDemand
+}

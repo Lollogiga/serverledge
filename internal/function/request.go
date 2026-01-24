@@ -35,6 +35,24 @@ type ExecutionReport struct {
 	OffloadLatency float64 // time spent offloading the request
 	Duration       float64 // execution (service) time
 	Output         string
+
+	VariantSchedulingReport *VariantSchedulingReport `json:"variant_scheduling,omitempty"`
+}
+
+type VariantSchedulingReport struct {
+	LogicalName      string `json:"logical_name,omitempty"`
+	InvokedFunction  string `json:"invoked_function,omitempty"`
+	SelectedFunction string `json:"selected_function,omitempty"`
+	VariantID        string `json:"variant_id,omitempty"`
+
+	AllowApprox    bool    `json:"allow_approx"`
+	MaxEnergyJoule float64 `json:"max_energy_joule,omitempty"`
+
+	EstimatedEnergy float64 `json:"estimated_energy_joule,omitempty"`
+	WarmHint        bool    `json:"warm_hint"`
+
+	AccuracyScore  float64 `json:"accuracy_score"`
+	DecisionReason string  `json:"decision_reason,omitempty"`
 }
 
 type Response struct {

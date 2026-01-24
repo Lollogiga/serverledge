@@ -136,7 +136,7 @@ func Init() {
 
 	invokeCmd.Flags().Float64Var(
 		&maxEnergy,
-		"maxEnergy",
+		"maxEnergyJoule",
 		0.0,
 		"Maximum energy budget in Joules (used only if --allow-approx is set)",
 	)
@@ -257,10 +257,6 @@ func invoke(cmd *cobra.Command, _ []string) {
 			os.Exit(1)
 		}
 	}
-	var maxEnergyPtr *float64
-	if cmd.Flags().Changed("max-energy") {
-		maxEnergyPtr = &maxEnergy
-	}
 	// Prepare request
 	request := client.InvocationRequest{
 		Params:          paramsMap,
@@ -271,7 +267,7 @@ func invoke(cmd *cobra.Command, _ []string) {
 		Async:           asyncInvocation,
 
 		AllowApprox:    allowApprox,
-		MaxEnergyJoule: maxEnergyPtr,
+		MaxEnergyJoule: &maxEnergy,
 	}
 	invocationBody, err := json.Marshal(request)
 	if err != nil {
