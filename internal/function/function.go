@@ -3,7 +3,6 @@ package function
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/cache"
@@ -99,12 +98,6 @@ func getFromEtcd(name string) (*Function, bool) {
 
 // SaveToEtcd registers the function to Etcd
 func (f *Function) SaveToEtcd() error {
-	log.Printf(
-		"[SAVE] name=%s logical=%q variant=%q\n",
-		f.Name,
-		f.LogicalName,
-		f.VariantID,
-	)
 	cli, err := utils.GetEtcdClient()
 	if err != nil {
 		return err
