@@ -132,7 +132,7 @@ EOF
   $SERVERLEDGE invoke \
     --function ImageClassification \
     --allowApprox \
-    --maxEnergyJoule 0.0000000001 \
+    --maxEnergyJoule 1.35 \
     --params_file "$PARAMS_FILE" \
     --ret_output
 
