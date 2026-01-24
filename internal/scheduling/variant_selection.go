@@ -12,6 +12,7 @@ import (
 )
 
 const energyEpsilonRatio = 0.05 // 5%
+const worstAccuracyScore = 1e12
 
 func energyEpsilon(budget float64) float64 {
 	return budget * energyEpsilonRatio
@@ -19,7 +20,7 @@ func energyEpsilon(budget float64) float64 {
 
 func energyCostJoule(fn *function.Function, warm bool) (float64, error) {
 	if fn.EnergyProfile == nil {
-		return math.Inf(1), errors.New("missing energy profile")
+		return worstAccuracyScore, errors.New("missing energy profile")
 	}
 
 	includeColdStart := config.GetBool(
@@ -51,7 +52,7 @@ func accuracyScore(fn *function.Function) float64 {
 		if fn.OutputModel.ErrorEstimate != nil {
 			return *fn.OutputModel.ErrorEstimate
 		}
-		return math.Inf(1)
+		return worstAccuracyScore
 
 	case "quality":
 		if fn.OutputModel.Quality != nil {
@@ -64,11 +65,11 @@ func accuracyScore(fn *function.Function) float64 {
 				return 2.0
 			}
 		}
-		return math.Inf(1)
+		return worstAccuracyScore
 	}
 
 	// Tipo sconosciuto → pessimistico
-	return math.Inf(1)
+	return worstAccuracyScore
 }
 
 func SelectEnergyAwareVariant(

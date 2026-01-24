@@ -11,7 +11,7 @@
       },
       "output":{
         "type": "quality",
-        "quality:": "High"
+        "quality": "High"
       },
       "is_approximate": false
     },
@@ -26,7 +26,7 @@
       },
       "output":{
         "type": "quality",
-        "quality:": "Low"
+        "quality": "Low"
       },
       "is_approximate": true
     }
