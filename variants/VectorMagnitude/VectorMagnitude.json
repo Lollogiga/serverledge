@@ -1,7 +1,7 @@
 {
   "variants": [
     {
-      "id": "Base",
+      "id": "base",
       "runtime": "python310",
       "entry_point": "VectorMagnitude.handler",
       "src": "VectorMagnitude.py",

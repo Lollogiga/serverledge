@@ -1,7 +1,7 @@
 {
   "variants": [
     {
-      "id": "Base",
+      "id": "base",
       "runtime": "python310",
       "entry_point": "Sqrt.handler",
       "src": "Sqrt.py",

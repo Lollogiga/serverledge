@@ -1,7 +1,7 @@
 {
   "variants": [
     {
-      "id": "base-py",
+      "id": "base",
       "runtime": "python310",
       "entry_point": "piLeibniz.handler",
       "src": "piLeibniz.py",

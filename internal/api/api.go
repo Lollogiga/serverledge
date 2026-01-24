@@ -195,7 +195,7 @@ func CreateOrUpdateFunction(c echo.Context) error {
 			FileSource: &variants.FileSource{
 				BaseDir: variantsDir,
 			},
-			GeneratorSource: nil, // future
+			GeneratorSource: &variants.GeneratorSource{}, // future
 		}
 
 		source, err := variantFactory.GetSource(&fn)
@@ -214,13 +214,12 @@ func CreateOrUpdateFunction(c echo.Context) error {
 			return c.String(http.StatusUnprocessableEntity, "No variants provided")
 		}
 
-		validated, err := variants.MergeAndValidate(nil, loadedVariants)
-		if err != nil {
+		if err := variants.ValidateVariantsOnly(loadedVariants); err != nil {
 			log.Printf("Variant validation failed: %v\n", err)
 			return c.String(http.StatusUnprocessableEntity, err.Error())
 		}
 
-		if err := variants.CreateInternalVariants(ctx, &fn, validated); err != nil {
+		if err := variants.CreateInternalVariants(&fn, loadedVariants); err != nil {
 			log.Printf("Failed creating variant functions: %v\n", err)
 			return c.String(http.StatusInternalServerError, err.Error())
 		}

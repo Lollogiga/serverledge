@@ -1,7 +1,7 @@
 {
   "variants": [
     {
-      "id": "Base",
+      "id": "base",
       "runtime": "python-ml",
       "entry_point": "ImageClassification.handler",
       "src": "ImageClassification.py",
