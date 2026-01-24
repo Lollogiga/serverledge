@@ -3,6 +3,7 @@ package function
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/cache"
@@ -13,7 +14,10 @@ import (
 
 // Function describes a serverless function.
 type Function struct {
-	Name            string
+	Name        string
+	LogicalName string `json:"logical_name"`
+	VariantID   string `json:"variant_id"`
+
 	Runtime         string  // example: python310
 	MemoryMB        int64   // MB
 	CPUDemand       float64 // 1.0 -> 1 core
@@ -24,9 +28,9 @@ type Function struct {
 	Signature       *Signature
 
 	//New parameters for variant
-	Variants          []Variant
-	AllowApprox       bool
-	VariantsProfileID string
+	AllowApprox   bool           `json:"allow_approx"`
+	EnergyProfile *EnergyProfile `json:"energy,omitempty"`
+	OutputModel   *OutputModel   `json:"output,omitempty"`
 }
 
 func (f *Function) getEtcdKey() string {
@@ -95,6 +99,12 @@ func getFromEtcd(name string) (*Function, bool) {
 
 // SaveToEtcd registers the function to Etcd
 func (f *Function) SaveToEtcd() error {
+	log.Printf(
+		"[SAVE] name=%s logical=%q variant=%q\n",
+		f.Name,
+		f.LogicalName,
+		f.VariantID,
+	)
 	cli, err := utils.GetEtcdClient()
 	if err != nil {
 		return err

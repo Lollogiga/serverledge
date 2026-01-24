@@ -1,7 +1,6 @@
 package variants
 
 import (
-	"context"
 	"fmt"
 	"log"
 
@@ -10,63 +9,68 @@ import (
 
 // CreateInternalVariants materializes runtime functions for each variant.
 // Variants are stored directly in Etcd, bypassing the HTTP API layer.
-func CreateInternalVariants(ctx context.Context, fn *function.Function) error {
+func CreateInternalVariants(
+	logicalFn *function.Function,
+	variants []function.Variant,
+) error {
 
-	if fn == nil {
+	if logicalFn == nil {
 		return fmt.Errorf("nil function passed to CreateInternalVariants")
 	}
-
-	// Only logical functions can spawn variants
-	if !fn.AllowApprox {
-		return nil
+	if logicalFn.Name == "" {
+		return fmt.Errorf("logical function name is empty")
+	}
+	if len(variants) == 0 {
+		return fmt.Errorf("no variants provided")
 	}
 
-	for _, v := range fn.Variants {
+	for i, v := range variants {
 
-		internalName := fmt.Sprintf("%s-%s", fn.Name, v.ID)
+		// ✅ BASE VARIANT keeps the logical name EXACTLY
+		internalName := ""
+		if i == 0 {
+			internalName = logicalFn.Name
+		} else {
+			internalName = fmt.Sprintf("%s-%s", logicalFn.Name, v.ID)
+		}
 
 		// Idempotency check
 		if _, exists := function.GetFunction(internalName); exists {
-			log.Printf("[variants] variant function %s already exists, skipping\n", internalName)
+			log.Printf("[variants] function %s already exists, skipping\n", internalName)
 			continue
 		}
 
-		// 🔒 Safety check: code must already be prepared
+		// Safety check: code must already be prepared
 		if v.TarCode == "" {
-			return fmt.Errorf(
-				"variant %s has empty TarCode (src=%s): FileSource not executed?",
-				v.ID, v.Src,
-			)
+			return fmt.Errorf("variant %s has empty TarCode (src=%s)", v.ID, v.Src)
 		}
 
-		log.Printf("[variants] creating variant runtime function %s\n", internalName)
+		log.Printf("[variants] creating function %s (variant_id=%s)\n", internalName, v.ID)
 
 		variantFn := &function.Function{
-			Name:           internalName,
-			Runtime:        v.Runtime,
-			MemoryMB:       fn.MemoryMB,
-			CPUDemand:      fn.CPUDemand,
-			MaxConcurrency: fn.MaxConcurrency,
-			Handler:        v.EntryPoint,
+			// Identity
+			Name:        internalName,
+			LogicalName: logicalFn.Name,
+			VariantID:   v.ID,
 
-			// 🔑 CRITICAL FIX
+			// Runtime
+			Runtime:         v.Runtime,
+			Handler:         v.EntryPoint,
 			TarFunctionCode: v.TarCode,
 
-			CustomImage: fn.CustomImage,
-			Signature:   fn.Signature,
+			MemoryMB:       logicalFn.MemoryMB,
+			CPUDemand:      logicalFn.CPUDemand,
+			MaxConcurrency: logicalFn.MaxConcurrency,
+			CustomImage:    logicalFn.CustomImage,
+			Signature:      logicalFn.Signature,
 
-			// Semantics
-			AllowApprox:       false,
-			Variants:          nil,
-			VariantsProfileID: fn.VariantsProfileID,
+			// Scheduling metadata
+			EnergyProfile: &v.Energy,
+			OutputModel:   &v.Output,
 		}
 
 		if err := variantFn.SaveToEtcd(); err != nil {
-			return fmt.Errorf(
-				"failed saving variant function %s to etcd: %w",
-				internalName,
-				err,
-			)
+			return fmt.Errorf("failed saving function %s to etcd: %w", internalName, err)
 		}
 	}
 

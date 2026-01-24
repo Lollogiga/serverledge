@@ -14,7 +14,7 @@ type Factory struct {
 func (f *Factory) GetSource(fn *function.Function) (Source, error) {
 
 	// 1. Caso deterministico: profilo su file
-	if f.FileSource != nil && f.FileSource.Exists(fn.VariantsProfileID) {
+	if f.FileSource != nil && f.FileSource.Exists(fn.Name) {
 		return f.FileSource, nil
 	}
 

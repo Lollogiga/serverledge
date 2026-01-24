@@ -216,7 +216,7 @@ func showHelpAndExit(cmd *cobra.Command) {
 	os.Exit(1)
 }
 
-func invoke(cmd *cobra.Command, args []string) {
+func invoke(cmd *cobra.Command, _ []string) {
 	if len(funcName) < 1 {
 		fmt.Printf("Invalid function name.\n")
 		showHelpAndExit(cmd)
@@ -402,8 +402,7 @@ func create(cmd *cobra.Command, args []string) {
 		CustomImage:     customImage,
 		Signature:       sig,
 
-		AllowApprox:       allowApprox,
-		VariantsProfileID: variantsProfileID,
+		AllowApprox: allowApprox,
 	}
 
 	requestBody, err := json.Marshal(request)

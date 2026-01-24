@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/client"
-	"github.com/serverledge-faas/serverledge/internal/container"
 	"github.com/serverledge-faas/serverledge/internal/function"
 	"github.com/serverledge-faas/serverledge/internal/node"
 	"github.com/serverledge-faas/serverledge/internal/registration"
@@ -140,25 +139,23 @@ func PollAsyncResult(c echo.Context) error {
 func CreateOrUpdateFunction(c echo.Context) error {
 
 	log.Println("Parse Request")
+
 	// ------------------------------------------------------------------
-	// 1. Parse request
+	// 1. Parse request (logical function + create-time flags)
 	// ------------------------------------------------------------------
-	var f function.Function
-	if err := json.NewDecoder(c.Request().Body).Decode(&f); err != nil && err != io.EOF {
+	var fn function.Function
+	if err := json.NewDecoder(c.Request().Body).Decode(&fn); err != nil && err != io.EOF {
 		log.Printf("Could not parse request: %v\n", err)
 		return c.String(http.StatusBadRequest, "Invalid request body")
 	}
 
-	fn := &f
 	ctx := c.Request().Context()
 
-	log.Println("Create/Update Function")
 	// ------------------------------------------------------------------
-	// 2. Create vs Update check
+	// 2. Create vs Update
 	// ------------------------------------------------------------------
 	if c.Path() != "/update" {
 		if _, ok := function.GetFunction(fn.Name); ok {
-			log.Printf("Function '%s' already exists\n", fn.Name)
 			return c.String(http.StatusConflict, "Function already exists")
 		}
 		log.Printf("Creating function %s\n", fn.Name)
@@ -166,9 +163,8 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		log.Printf("Creating/updating function %s\n", fn.Name)
 	}
 
-	log.Println("Basic sanity checks")
 	// ------------------------------------------------------------------
-	// 3. Basic sanity checks (BASE FUNCTION ONLY)
+	// 3. Sanity checks (logical name only)
 	// ------------------------------------------------------------------
 	if fn.Name == "" {
 		return c.String(http.StatusUnprocessableEntity, "Function name is required")
@@ -182,34 +178,13 @@ func CreateOrUpdateFunction(c echo.Context) error {
 		fn.MaxConcurrency = 1
 	}
 
-	if fn.VariantsProfileID == "" {
-		fn.VariantsProfileID = fn.Name
-	}
+	// ------------------------------------------------------------------
+	// 4. Load variants (MANDATORY: base is included in JSON)
+	// ------------------------------------------------------------------
 
-	// ------------------------------------------------------------------
-	// 4. Validate BASE runtime only
-	// ------------------------------------------------------------------
-	if fn.Runtime != container.CUSTOM_RUNTIME {
-		runtime, ok := container.RuntimeToInfo[fn.Runtime]
-		if !ok {
-			return c.String(http.StatusNotFound, "Invalid runtime")
-		}
-		if fn.MaxConcurrency > 1 && !runtime.ConcurrencySupported {
-			log.Printf("Forcing max concurrency = 1 for runtime %s\n", fn.Runtime)
-			fn.MaxConcurrency = 1
-		}
-	} else {
-		if fn.MaxConcurrency > 1 {
-			log.Printf("Forcing max concurrency = 1 for custom runtime\n")
-			fn.MaxConcurrency = 1
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// 5. OPTIONAL: load/generate variants ONLY if AllowApprox == true
-	// ------------------------------------------------------------------
 	if fn.AllowApprox {
-		log.Println("AllowApprox enabled: loading/generating variants")
+
+		log.Println("AllowApprox enabled: loading variants")
 
 		variantsDir := os.Getenv("SERVERLEDGE_VARIANTS_DIR")
 		if variantsDir == "" {
@@ -220,61 +195,59 @@ func CreateOrUpdateFunction(c echo.Context) error {
 			FileSource: &variants.FileSource{
 				BaseDir: variantsDir,
 			},
-			GeneratorSource: &variants.GeneratorSource{}, // stub / future
+			GeneratorSource: nil, // future
 		}
 
-		source, err := variantFactory.GetSource(fn)
+		source, err := variantFactory.GetSource(&fn)
 		if err != nil {
 			log.Printf("No variant source available: %v\n", err)
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
 
-		loadedVariants, err := source.Load(ctx, fn)
+		loadedVariants, err := source.Load(ctx, &fn)
 		if err != nil {
 			log.Printf("Failed loading variants: %v\n", err)
 			return c.String(http.StatusNotFound, err.Error())
 		}
 
-		// Merge base (implicit) + loaded variants
-		merged, err := variants.MergeAndValidate(nil, loadedVariants)
+		if len(loadedVariants) == 0 {
+			return c.String(http.StatusUnprocessableEntity, "No variants provided")
+		}
+
+		validated, err := variants.MergeAndValidate(nil, loadedVariants)
 		if err != nil {
-			log.Printf("Variant merge failed: %v\n", err)
+			log.Printf("Variant validation failed: %v\n", err)
 			return c.String(http.StatusUnprocessableEntity, err.Error())
 		}
 
-		fn.Variants = merged
+		if err := variants.CreateInternalVariants(ctx, &fn, validated); err != nil {
+			log.Printf("Failed creating variant functions: %v\n", err)
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
 
+	} else {
 		// ------------------------------------------------------------------
-		// 6. Materialize internal variant functions
+		// LEGACY PATH (single function, NO variants)
 		// ------------------------------------------------------------------
-		if fn.AllowApprox && len(fn.Variants) > 0 {
-			if err := variants.CreateInternalVariants(ctx, fn); err != nil {
-				log.Printf("Failed creating internal variants: %v\n", err)
-				return c.String(http.StatusInternalServerError, err.Error())
-			}
+		log.Println("AllowApprox disabled: creating single function")
+
+		fn.LogicalName = fn.Name
+		fn.VariantID = "base"
+
+		if err := fn.SaveToEtcd(); err != nil {
+			log.Printf("Failed saving function: %v\n", err)
+			return c.String(http.StatusServiceUnavailable, "Failed to save function")
 		}
 	}
 
-	log.Println("Persist function to Etcd")
 	// ------------------------------------------------------------------
-	// 6. Persist function to Etcd
+	// 6. Response
 	// ------------------------------------------------------------------
-	if err := fn.SaveToEtcd(); err != nil {
-		log.Printf("Failed to save function: %v\n", err)
-		return c.String(http.StatusServiceUnavailable, "Failed to save function")
-	}
-
-	log.Println("Create Response")
-	// ------------------------------------------------------------------
-	// 7. Response
-	// ------------------------------------------------------------------
-	response := struct {
+	return c.JSON(http.StatusOK, struct {
 		Created string `json:"created"`
 	}{
 		Created: fn.Name,
-	}
-
-	return c.JSON(http.StatusOK, response)
+	})
 }
 
 // DeleteFunction handles a function deletion request.
