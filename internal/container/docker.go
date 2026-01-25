@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/google/uuid"
 	"github.com/serverledge-faas/serverledge/internal/config"
+	"github.com/serverledge-faas/serverledge/internal/energy"
 	//	"github.com/docker/docker/pkg/stdcopy"
 )
 
@@ -68,6 +69,17 @@ func (cf *DockerFactory) Create(image string, opts *ContainerOptions) (Container
 
 	r, err := cf.cli.ContainerInspect(cf.ctx, id)
 	log.Printf("Container %s has name %s\n", id, r.Name)
+
+	energy.RegisterContainer(&energy.ContainerState{
+		ContainerID: string(id),
+
+		// queste info sono disponibili QUI tramite opts
+		LogicalName: opts.Function,
+		VariantName: opts.Function, // se non hai distinzione variant/logical qui va bene così
+		Runtime:     "",
+
+		HasValue: false,
+	})
 
 	return id, err
 }

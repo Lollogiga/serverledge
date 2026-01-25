@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/serverledge-faas/serverledge/internal/api"
 	"github.com/serverledge-faas/serverledge/internal/config"
+	"github.com/serverledge-faas/serverledge/internal/energy"
 	"github.com/serverledge-faas/serverledge/internal/metrics"
 	"github.com/serverledge-faas/serverledge/internal/node"
 	"github.com/serverledge-faas/serverledge/internal/registration"
@@ -76,6 +77,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// =========================
+	// Energy feedback loop
+	// =========================
+	prom := energy.NewPrometheusClient("http://localhost:9090")
+	energy.StartCollector(prom, 5*time.Second)
 
 	api.StartAPIServer(e)
 

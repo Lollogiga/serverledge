@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/container"
+	"github.com/serverledge-faas/serverledge/internal/energy"
 	"github.com/serverledge-faas/serverledge/internal/executor"
 )
 
@@ -15,6 +16,16 @@ const HANDLER_DIR = "/app"
 func Execute(cont *container.Container, r *scheduledRequest, isWarm bool) error {
 
 	log.Printf("[%s] Executing on container: %v", r.Fun, cont.ID)
+
+	energy.RegisterContainer(&energy.ContainerState{
+		ContainerID: string(cont.ID),
+
+		LogicalName: r.Fun.LogicalName,
+		VariantName: r.Fun.Name,
+		Runtime:     r.Fun.Runtime,
+
+		HasValue: false,
+	})
 
 	var req executor.InvocationRequest
 	if r.Fun.Runtime == container.CUSTOM_RUNTIME {
@@ -46,13 +57,11 @@ func Execute(cont *container.Container, r *scheduledRequest, isWarm bool) error 
 			fmt.Printf("Failed to get log: %v\n", errLog)
 		}
 
-		// notify scheduler
 		completions <- &completionNotification{r: r, cont: cont, failed: true}
 		return fmt.Errorf("[%s] Execution failed on container %v: %v ", r, cont.ID, err)
 	}
 
 	if !response.Success {
-		// notify scheduler
 		completions <- &completionNotification{r: r, cont: cont, failed: true}
 		return fmt.Errorf("[%s] Function execution failed %v", r, cont.ID)
 	}
@@ -62,7 +71,6 @@ func Execute(cont *container.Container, r *scheduledRequest, isWarm bool) error 
 	r.IsWarmStart = isWarm
 	r.Duration = time.Now().Sub(t0).Seconds() - invocationWait.Seconds()
 	r.ResponseTime = time.Now().Sub(r.Arrival).Seconds()
-	// initializing containers may require invocation retries, adding // latency
 	r.InitTime = initTime + invocationWait.Seconds()
 
 	// notify scheduler
