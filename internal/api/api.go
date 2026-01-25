@@ -189,7 +189,6 @@ func PollAsyncResult(c echo.Context) error {
 
 // CreateOrUpdateFunction handles a function creation/update request.
 func CreateOrUpdateFunction(c echo.Context) error {
-
 	log.Println("Parse Request")
 
 	// ------------------------------------------------------------------

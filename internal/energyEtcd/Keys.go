@@ -1,4 +1,4 @@
-package energyStore
+package energyEtcd
 
 import "fmt"
 
