@@ -12,9 +12,13 @@ type ContainerState struct {
 	VariantName string
 	Runtime     string
 
-	// ultimo valore letto da Prometheus
+	// ultimo valore letto da Prometheus (energia cumulativa)
 	LastJoule float64
 	HasValue  bool
+
+	// contatore invocazioni cumulativo osservato all'ultimo tick
+	LastInvocations uint64
+	HasInvValue     bool
 
 	// timestamp ultima lettura
 	LastRead time.Time
@@ -34,7 +38,9 @@ func RegisterContainer(state *ContainerState) {
 func UnregisterContainer(containerID string) {
 	mu.Lock()
 	defer mu.Unlock()
+
 	delete(containers, containerID)
+	ResetInvocations(containerID) // cleanup contatore invocazioni
 }
 
 func SnapshotContainers() []*ContainerState {

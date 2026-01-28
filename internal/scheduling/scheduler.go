@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/container"
+	"github.com/serverledge-faas/serverledge/internal/energy"
 	"github.com/serverledge-faas/serverledge/internal/function"
 	"github.com/serverledge-faas/serverledge/internal/metrics"
 	"github.com/serverledge-faas/serverledge/internal/node"
@@ -52,6 +53,14 @@ func Run(p Policy) {
 		case r = <-requests: // receive request
 			go p.OnArrival(r)
 		case c = <-completions:
+			// =====================================================
+			// Energy: contatore invocazioni per container (LOCAL ONLY)
+			// =====================================================
+			if !c.failed && !c.r.offloaded && c.cont != nil {
+				energy.IncInvocation(string(c.cont.ID))
+				log.Printf("N=%d", energy.LoadInvocations(string(c.cont.ID)))
+
+			}
 			node.HandleCompletion(c.cont, c.r.Fun)
 			p.OnCompletion(c.r.Fun, c.r.ExecutionReport)
 
