@@ -2,25 +2,40 @@ package energy
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/influx"
 )
 
+var influxWriter *influx.Writer
+
 func writeColdStart(state *ContainerState, joule float64) {
 	writeSample(state, "coldstart_joule", joule)
 }
 
+func InitEnergyWriter() error {
+	w, err := influx.NewWriter()
+	if err != nil {
+		return err
+	}
+	influxWriter = w
+	return nil
+}
+
 func writeInvocation(state *ContainerState, joule float64) {
+	log.Printf(
+		"[energy][writer] writeInvocation container=%s joule=%.6f",
+		state.ContainerID,
+		joule,
+	)
 	writeSample(state, "invocation_joule", joule)
 }
 
 func writeSample(state *ContainerState, field string, joule float64) {
-	writer, err := influx.NewWriter()
-	if err != nil {
+	if influxWriter == nil {
 		return
 	}
-	defer writer.Close()
 
 	sample := influx.Point{
 		Measurement: "energy_sample",
@@ -36,5 +51,5 @@ func writeSample(state *ContainerState, field string, joule float64) {
 		Time: time.Now(),
 	}
 
-	_ = writer.WritePoint(context.Background(), sample)
+	_ = influxWriter.WritePoint(context.Background(), sample)
 }

@@ -81,8 +81,13 @@ func main() {
 	// =========================
 	// Energy feedback loop
 	// =========================
+
+	if err := energy.InitEnergyWriter(); err != nil {
+		log.Printf("[energy] influx disabled: %v", err)
+	}
+
 	prom := energy.NewPrometheusClient("http://localhost:9090")
-	energy.StartCollector(prom, 5*time.Second)
+	energy.StartCollector(prom, 10*time.Second)
 
 	api.StartAPIServer(e)
 

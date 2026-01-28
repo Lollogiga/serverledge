@@ -1,6 +1,7 @@
 package energy
 
 import (
+	"log"
 	"sync"
 	"time"
 )
@@ -17,8 +18,10 @@ type ContainerState struct {
 	HasValue  bool
 
 	// contatore invocazioni cumulativo osservato all'ultimo tick
-	LastInvocations uint64
-	HasInvValue     bool
+	LastInvocations    uint64
+	HasInvValue        bool
+	PendingEnergyJ     float64
+	PendingInvocations uint64
 
 	// timestamp ultima lettura
 	LastRead time.Time
@@ -32,6 +35,18 @@ var (
 func RegisterContainer(state *ContainerState) {
 	mu.Lock()
 	defer mu.Unlock()
+
+	if existing, ok := containers[state.ContainerID]; ok {
+		// aggiorna SOLO metadata
+		log.Printf("[energy][registry] update metadata container=%s (baseline preserved)", state.ContainerID)
+		existing.LogicalName = state.LogicalName
+		existing.VariantName = state.VariantName
+		existing.Runtime = state.Runtime
+		return
+	}
+	log.Printf("[energy][registry] new container=%s", state.ContainerID)
+
+	// primo inserimento
 	containers[state.ContainerID] = state
 }
 
