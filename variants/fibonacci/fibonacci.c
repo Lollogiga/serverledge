@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*REMEMBER TO INVOKE WITH X*/
+
 /*
  * Estrae il parametro x passato come:
  *   --x=10
