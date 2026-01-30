@@ -28,10 +28,13 @@ func CreateContainer(f *function.Function, forceImagePull bool) (*Container, err
 	}
 
 	opts := &ContainerOptions{
-		MemoryMB: f.MemoryMB,
-		CPUQuota: f.CPUDemand,
-		Function: f.Name,
+		MemoryMB:    f.MemoryMB,
+		CPUQuota:    f.CPUDemand,
+		Function:    f.Name,
+		Variant:     f.VariantID,
+		LogicalName: f.LogicalName,
 	}
+
 	return newContainer(image, f.TarFunctionCode, opts)
 }
 

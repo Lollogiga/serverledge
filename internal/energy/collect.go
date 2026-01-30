@@ -10,54 +10,55 @@ func Collect(prom *PrometheusClient) error {
 	now := time.Now()
 
 	containers := SnapshotContainers()
-	log.Printf("[energy][collect] containers=%d", len(containers))
+	//log.Printf("[energy][collect] containers=%d", len(containers))
 
 	for _, state := range containers {
 
-		// 1) energia cumulativa
+		// 1) energia cumulativa (Kepler)
 		jouleNow, err := prom.ReadContainerJoule(state.ContainerID)
 		if err != nil {
 			if errors.Is(err, ErrNoData) {
-				log.Printf("[energy][collect] container=%s no kepler data yet", state.ContainerID)
+				//log.Printf("[energy][collect] container=%s no kepler data yet", state.ContainerID)
 				continue
 			}
 			if errors.Is(err, ErrTransient) {
-				log.Printf("[energy][collect] transient kepler error -> skip cycle")
+				//log.Printf("[energy][collect] transient kepler error -> skip cycle")
 				return ErrTransient
 			}
-			log.Printf("[energy][collect] unexpected error container=%s: %v", state.ContainerID, err)
+			//log.Printf("[energy][collect] unexpected error container=%s: %v", state.ContainerID, err)
 			return ErrTransient
 		}
 
-		// 2) invocazioni cumulative
+		// 2) invocazioni cumulative (contatore locale)
 		nNow := LoadInvocations(state.ContainerID)
 
-		log.Printf(
+		/*log.Printf(
 			"[energy][collect] container=%s E_now=%.6fJ N_now=%d hasBaseline=%v pendingE=%.6f pendingN=%d",
 			state.ContainerID, jouleNow, nNow, state.HasValue, state.PendingEnergyJ, state.PendingInvocations,
-		)
+		)*/
 
-		// 3) baseline init
+		// 3) baseline init (prima osservazione)
 		if !state.HasValue {
 			state.LastJoule = jouleNow
-			state.LastInvocations = nNow // qui ora va bene: baseline parte dall’osservato
+			state.LastInvocations = nNow
 			state.HasValue = true
-			state.HasInvValue = true
 			state.LastRead = now
 
+			// reset accumulatori (difensivo)
+			state.PendingEnergyJ = 0
+			state.PendingInvocations = 0
+
 			log.Printf(
-				"[energy][collect] BASELINE INIT container=%s E=%.6f N_base=%d",
 				state.ContainerID, jouleNow, nNow,
 			)
 			continue
 		}
 
-		// 4) delta
+		// 4) delta energia
 		dE := jouleNow - state.LastJoule
 
-		// gestisci possibili reset (container rinato / metrica ripartita)
+		// Reset / rinascita container / reset metrica
 		if dE < 0 {
-			log.Printf("[energy][collect] RESET detected container=%s (dE<0). Re-baselining.", state.ContainerID)
 			state.LastJoule = jouleNow
 			state.LastInvocations = nNow
 			state.PendingEnergyJ = 0
@@ -66,8 +67,8 @@ func Collect(prom *PrometheusClient) error {
 			continue
 		}
 
+		// Reset invocations (should not happen often, but handle it)
 		if nNow < state.LastInvocations {
-			log.Printf("[energy][collect] RESET detected container=%s (N decreased). Re-baselining.", state.ContainerID)
 			state.LastJoule = jouleNow
 			state.LastInvocations = nNow
 			state.PendingEnergyJ = 0
@@ -76,43 +77,55 @@ func Collect(prom *PrometheusClient) error {
 			continue
 		}
 
+		// 5) delta invocazioni
 		dN := nNow - state.LastInvocations
 
-		log.Printf("[energy][collect] container=%s dE=%.6f dN=%d", state.ContainerID, dE, dN)
+		//log.Printf("[energy][collect] container=%s dE=%.6f dN=%d", state.ContainerID, dE, dN)
 
-		// 5) accumula in pending
-		// - se Kepler “lagga”, dE può arrivare dopo dN
+		// 6) accumula pending (gestione lag Kepler/Prometheus)
+		// - dN può arrivare prima di dE
+		// - dE può arrivare in un tick successivo con dN=0
 		state.PendingEnergyJ += dE
 		state.PendingInvocations += dN
 
-		// 6) se ho invocazioni pendenti ma energia ancora 0 → aspetto tick successivo
-		if state.PendingInvocations == 0 {
-			// nulla da attribuire
-		} else if state.PendingEnergyJ <= 0 {
-			log.Printf(
+		// 7) se ho invocazioni pendenti ma energia non ancora arrivata -> attendo
+		if state.PendingInvocations > 0 && state.PendingEnergyJ <= 0 {
+			/*log.Printf(
 				"[energy][collect] container=%s WAIT energy lag (pendingN=%d pendingE=%.6f)",
 				state.ContainerID, state.PendingInvocations, state.PendingEnergyJ,
-			)
-		} else {
-			// 7) finalmente attribuisco energia alle invocazioni accumulate
+			)*/
+		}
+
+		// 8) quando entrambi sono disponibili, attribuisco energia
+		if state.PendingInvocations > 0 && state.PendingEnergyJ > 0 {
+
 			eInv := state.PendingEnergyJ / float64(state.PendingInvocations)
 
-			log.Printf(
-				"[energy][collect] WILL WRITE container=%s eInv=%.6f (pendingE=%.6f pendingN=%d)",
+			/*log.Printf(
+				"[energy][collect] APPLY container=%s eInv=%.6f (pendingE=%.6f pendingN=%d)",
 				state.ContainerID, eInv, state.PendingEnergyJ, state.PendingInvocations,
+			)*/
+
+			// (A) aggiorna stima in etcd (stato per scheduler)
+			UpdateVariantEnergyEMS(state.FunctionName, eInv)
+
+			log.Printf(
+				"[DEBUG][collect-before-write] container=%s fn=%s variant=%s eInv=%.6f",
+				state.ContainerID,
+				state.FunctionName,
+				state.VariantID,
+				eInv,
 			)
 
+			// (B) salva campione in Influx (storico per grafici)
 			writeInvocation(state, eInv)
 
-			// NB: EMA/EMS in etcd -> step 3
-			// updateInvocationEtcd(state, eInv)
-
-			// reset pending
+			// reset accumulatori dopo attribuzione (fondamentale)
 			state.PendingEnergyJ = 0
 			state.PendingInvocations = 0
 		}
 
-		// 8) aggiorna baseline SEMPRE a fine tick
+		// 9) aggiorna baseline SEMPRE a fine tick
 		state.LastJoule = jouleNow
 		state.LastInvocations = nNow
 		state.LastRead = now

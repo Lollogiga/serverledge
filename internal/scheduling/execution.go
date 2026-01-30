@@ -20,11 +20,10 @@ func Execute(cont *container.Container, r *scheduledRequest, isWarm bool) error 
 	energy.RegisterContainer(&energy.ContainerState{
 		ContainerID: string(cont.ID),
 
-		LogicalName: r.Fun.LogicalName,
-		VariantName: r.Fun.Name,
-		Runtime:     r.Fun.Runtime,
-
-		HasValue: false,
+		FunctionName: r.Fun.Name,
+		LogicalName:  r.Fun.LogicalName,
+		VariantID:    r.Fun.VariantID,
+		HasValue:     false,
 	})
 
 	var req executor.InvocationRequest

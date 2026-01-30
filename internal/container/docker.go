@@ -38,28 +38,31 @@ func InitDockerContainerFactory() *DockerFactory {
 func (cf *DockerFactory) Create(image string, opts *ContainerOptions) (ContainerID, error) {
 	if !cf.HasImage(image) {
 		_ = cf.PullImage(image)
-		// error ignored, as we might still have a stale copy of the image
 	}
 
-	contResources := container.Resources{Memory: opts.MemoryMB * 1048576} // convert to bytes
+	contResources := container.Resources{Memory: opts.MemoryMB * 1048576}
 	if opts.CPUQuota > 0.0 {
-		contResources.CPUPeriod = 50000 // 50ms
-		contResources.CPUQuota = (int64)(50000.0 * opts.CPUQuota)
+		contResources.CPUPeriod = 50000
+		contResources.CPUQuota = int64(50000.0 * opts.CPUQuota)
 	}
 
 	functionName := strings.ReplaceAll(opts.Function, "/", "_")
-
 	uuidStr := uuid.New().String()
-
 	containerName := fmt.Sprintf("sl-%s-%s", functionName, uuidStr)
 
-	resp, err := cf.cli.ContainerCreate(cf.ctx, &container.Config{
-		Image: image,
-		Cmd:   opts.Cmd,
-		Env:   opts.Env,
-		Tty:   false,
-	}, &container.HostConfig{Resources: contResources}, nil, nil, containerName)
-
+	resp, err := cf.cli.ContainerCreate(
+		cf.ctx,
+		&container.Config{
+			Image: image,
+			Cmd:   opts.Cmd,
+			Env:   opts.Env,
+			Tty:   false,
+		},
+		&container.HostConfig{Resources: contResources},
+		nil,
+		nil,
+		containerName,
+	)
 	if err != nil {
 		log.Printf("Could not create the container: %v\n", err)
 		return "", err
@@ -67,21 +70,26 @@ func (cf *DockerFactory) Create(image string, opts *ContainerOptions) (Container
 
 	id := resp.ID
 
-	r, err := cf.cli.ContainerInspect(cf.ctx, id)
+	r, _ := cf.cli.ContainerInspect(cf.ctx, id)
 	log.Printf("Container %s has name %s\n", id, r.Name)
 
 	energy.RegisterContainer(&energy.ContainerState{
-		ContainerID: string(id),
-
-		// queste info sono disponibili QUI tramite opts
-		LogicalName: opts.Function,
-		VariantName: opts.Function, // se non hai distinzione variant/logical qui va bene così
-		Runtime:     "",
-
-		HasValue: false,
+		ContainerID:  id,
+		FunctionName: opts.Function,
+		LogicalName:  opts.LogicalName, // oppure derivato
+		VariantID:    opts.Variant,
+		HasValue:     false,
 	})
 
-	return id, err
+	log.Printf(
+		"[DEBUG][container-register] id=%s function=%s logical=%s variant=%s",
+		id,
+		opts.Function,
+		opts.LogicalName,
+		opts.Variant,
+	)
+
+	return id, nil
 }
 
 func (cf *DockerFactory) CopyToContainer(contID ContainerID, content io.Reader, destPath string) error {

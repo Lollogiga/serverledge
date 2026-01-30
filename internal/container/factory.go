@@ -19,12 +19,13 @@ type Factory interface {
 
 // ContainerOptions contains options for container creation.
 type ContainerOptions struct {
-	Cmd      []string
-	Env      []string
-	MemoryMB int64
-	CPUQuota float64
-	Function string
-	Variant  string
+	Cmd         []string
+	Env         []string
+	MemoryMB    int64
+	CPUQuota    float64
+	Function    string
+	Variant     string
+	LogicalName string
 }
 
 type ContainerID = string
