@@ -31,9 +31,11 @@ type ContainerOptions struct {
 type ContainerID = string
 
 type Container struct {
-	ID             ContainerID
-	RequestsCount  int16
-	ExpirationTime int64
+	ID               ContainerID
+	RequestsCount    int16
+	ExpirationTime   int64
+	CurrentFunction  string // Nome della funzione attualmente caricata nel container
+	PoolKey          string // Chiave del pool (Name o LogicalName:Runtime a seconda di ShareContainer)
 }
 
 // cf is the container factory for the node

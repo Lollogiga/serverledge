@@ -67,6 +67,9 @@ func CreateInternalVariants(
 			// Scheduling metadata
 			EnergyProfile: &v.Energy,
 			OutputModel:   &v.Output,
+
+			// Container sharing - eredita dalla funzione base
+			ShareContainer: logicalFn.ShareContainer,
 		}
 
 		if err := variantFn.SaveToEtcd(); err != nil {

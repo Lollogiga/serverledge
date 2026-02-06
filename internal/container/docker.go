@@ -25,7 +25,10 @@ type DockerFactory struct {
 
 func InitDockerContainerFactory() *DockerFactory {
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(
+		client.FromEnv,
+		client.WithVersion("1.44"),
+	)
 	if err != nil {
 		panic(err)
 	}

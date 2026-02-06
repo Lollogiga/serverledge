@@ -35,7 +35,20 @@ func CreateContainer(f *function.Function, forceImagePull bool) (*Container, err
 		LogicalName: f.LogicalName,
 	}
 
-	return newContainer(image, f.TarFunctionCode, opts)
+	// Determina la chiave del pool
+	poolKey := getPoolKey(f)
+
+	return newContainer(image, f.TarFunctionCode, opts, f.Name, poolKey)
+}
+
+// getPoolKey determina la chiave del pool basata su ShareContainer
+func getPoolKey(f *function.Function) string {
+	if f.ShareContainer && f.LogicalName != "" {
+		// Container condiviso tra funzioni/varianti con stesso LogicalName e Runtime
+		return f.LogicalName + ":" + f.Runtime
+	}
+	// Container dedicato alla singola funzione
+	return f.Name
 }
 
 func getImageForFunction(fun *function.Function) (string, error) {
@@ -54,7 +67,7 @@ func getImageForFunction(fun *function.Function) (string, error) {
 }
 
 // CreateContainer creates and starts a new container.
-func newContainer(image, codeTar string, opts *ContainerOptions) (*Container, error) {
+func newContainer(image, codeTar string, opts *ContainerOptions, functionName string, poolKey string) (*Container, error) {
 	contID, err := cf.Create(image, opts) // cf = container factory
 	if err != nil {
 		log.Printf("Failed container creation\n")
@@ -80,8 +93,10 @@ func newContainer(image, codeTar string, opts *ContainerOptions) (*Container, er
 	}
 
 	container := &Container{
-		ID:            contID,
-		RequestsCount: 0,
+		ID:              contID,
+		RequestsCount:   0,
+		CurrentFunction: functionName,
+		PoolKey:         poolKey,
 	}
 
 	return container, nil
@@ -183,4 +198,27 @@ func minInt(a, b int) int {
 	} else {
 		return b
 	}
+}
+
+// UpdateContainerCode aggiorna il codice in un container esistente
+// Questa funzione viene usata quando si riutilizza un container per una funzione/variante diversa
+func UpdateContainerCode(contID ContainerID, f *function.Function) error {
+	if len(f.TarFunctionCode) == 0 {
+		return nil // niente da fare
+	}
+
+	decodedCode, errDecode := base64.StdEncoding.DecodeString(f.TarFunctionCode)
+	if errDecode != nil {
+		log.Printf("Failed code decode for update\n")
+		return errDecode
+	}
+	
+	err := cf.CopyToContainer(contID, bytes.NewReader(decodedCode), "/app/")
+	if err != nil {
+		log.Printf("Failed code copy for update\n")
+		return err
+	}
+	
+	log.Printf("Updated code in container %s for function %s\n", contID, f.Name)
+	return nil
 }

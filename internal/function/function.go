@@ -32,6 +32,10 @@ type Function struct {
 	AllowApprox   bool           `json:"allow_approx"`
 	EnergyProfile *EnergyProfile `json:"energy,omitempty"`
 	OutputModel   *OutputModel   `json:"output,omitempty"`
+	
+	// Container sharing: se true, permette il riutilizzo di container tra funzioni/varianti
+	// con lo stesso LogicalName e Runtime
+	ShareContainer bool `json:"share_container,omitempty"`
 }
 
 func (f *Function) getEtcdKey() string {

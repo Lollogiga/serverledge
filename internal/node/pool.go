@@ -18,14 +18,27 @@ type ContainerPool struct {
 
 var NoWarmFoundErr = errors.New("no warm container is available")
 
+// getPoolKey determina la chiave del pool basata su ShareContainer
+func getPoolKey(f *function.Function) string {
+	if f.ShareContainer && f.LogicalName != "" {
+		// Container condiviso tra funzioni/varianti con stesso LogicalName e Runtime
+		return f.LogicalName + ":" + f.Runtime
+	}
+	// Container dedicato alla singola funzione
+	return f.Name
+}
+
 // GetContainerPool retrieves (or creates) the container pool for a function.
+// Se ShareContainer è true, usa LogicalName:Runtime come chiave per permettere
+// il riutilizzo tra funzioni/varianti. Altrimenti usa il Name della funzione.
 func GetContainerPool(f *function.Function) *ContainerPool {
-	if fp, ok := LocalResources.containerPools[f.Name]; ok {
+	poolKey := getPoolKey(f)
+	if fp, ok := LocalResources.containerPools[poolKey]; ok {
 		return fp
 	}
 
 	fp := newContainerPool()
-	LocalResources.containerPools[f.Name] = fp
+	LocalResources.containerPools[poolKey] = fp
 	return fp
 }
 
@@ -97,6 +110,15 @@ func acquireWarmContainer(f *function.Function) (*container.Container, error) {
 		// 1. try to reuse a running container
 		c, found := fp.getReusableContainer(f.MaxConcurrency)
 		if found {
+			// Se ShareContainer è abilitato e la funzione è diversa, aggiorna il codice
+			if f.ShareContainer && c.CurrentFunction != f.Name {
+				log.Printf("Reusing busy container %s, updating code from %s to %s", c.ID, c.CurrentFunction, f.Name)
+				if err := container.UpdateContainerCode(c.ID, f); err != nil {
+					log.Printf("Failed to update code in busy container: %v", err)
+					return nil, err
+				}
+				c.CurrentFunction = f.Name
+			}
 			c.RequestsCount += 1
 			log.Printf("Re-Using busy %s for %s. ", c.ID, f)
 			return c, nil
@@ -116,6 +138,22 @@ func acquireWarmContainer(f *function.Function) (*container.Container, error) {
 	LocalResources.busyPoolUsedMem += f.MemoryMB
 	LocalResources.warmPoolUsedMem -= f.MemoryMB
 	LocalResources.usedCPUs += f.CPUDemand
+
+	// Se ShareContainer è abilitato e la funzione è diversa, aggiorna il codice
+	if f.ShareContainer && c.CurrentFunction != f.Name {
+		log.Printf("Reusing warm container %s, updating code from %s to %s", c.ID, c.CurrentFunction, f.Name)
+		if err := container.UpdateContainerCode(c.ID, f); err != nil {
+			log.Printf("Failed to update code in warm container: %v", err)
+			// Ripristina le risorse
+			LocalResources.busyPoolUsedMem -= f.MemoryMB
+			LocalResources.warmPoolUsedMem += f.MemoryMB
+			LocalResources.usedCPUs -= f.CPUDemand
+			// Rimetti il container nel pool idle
+			fp.idle.PushFront(c)
+			return nil, err
+		}
+		c.CurrentFunction = f.Name
+	}
 
 	// add container to the busy pool
 	c.RequestsCount = 1
@@ -341,7 +379,8 @@ func ShutdownWarmContainersFor(f *function.Function) {
 	LocalResources.Lock()
 	defer LocalResources.Unlock()
 
-	fp, ok := LocalResources.containerPools[f.Name]
+	poolKey := getPoolKey(f)
+	fp, ok := LocalResources.containerPools[poolKey]
 	if !ok {
 		return
 	}
@@ -378,12 +417,8 @@ func ShutdownAllContainers() {
 	LocalResources.Lock()
 	defer LocalResources.Unlock()
 
-	for fun, pool := range LocalResources.containerPools {
-		functionDescriptor, _ := function.GetFunction(fun)
-		if functionDescriptor == nil {
-			log.Printf("Could not find function, cannot shutdown containers: %s\n", fun)
-			continue // should not happen
-		}
+	for poolKey, pool := range LocalResources.containerPools {
+		log.Printf("Shutting down containers in pool: %s\n", poolKey)
 
 		for elem := pool.idle.Front(); elem != nil; elem = elem.Next() {
 			warmed := elem.Value.(*container.Container)
@@ -391,27 +426,36 @@ func ShutdownAllContainers() {
 			log.Printf("Removing container with ID %s\n", warmed.ID)
 			pool.idle.Remove(temp)
 
+			memory, _ := container.GetMemoryMB(warmed.ID)
 			err := container.Destroy(warmed.ID)
 			if err != nil {
 				log.Printf("Error while destroying container %s: %s", warmed.ID, err)
 			}
-			LocalResources.warmPoolUsedMem -= functionDescriptor.MemoryMB
+			LocalResources.warmPoolUsedMem -= memory
 		}
 
 		for elem := pool.busy.Front(); elem != nil; elem = elem.Next() {
-			contID := elem.Value.(*container.Container).ID
+			c := elem.Value.(*container.Container)
+			contID := c.ID
 			temp := elem
 			log.Printf("Removing container with ID %s\n", contID)
-			pool.idle.Remove(temp)
+			pool.busy.Remove(temp)
 
+			memory, _ := container.GetMemoryMB(contID)
 			err := container.Destroy(contID)
 			if err != nil {
 				log.Printf("failed to destroy container %s: %v\n", contID, err)
 				continue
 			}
 
-			LocalResources.usedCPUs -= functionDescriptor.CPUDemand
-			LocalResources.busyPoolUsedMem -= functionDescriptor.MemoryMB
+			// Recuperiamo la funzione corrente per sapere le risorse da liberare
+			if c.CurrentFunction != "" {
+				f, ok := function.GetFunction(c.CurrentFunction)
+				if ok {
+					LocalResources.usedCPUs -= f.CPUDemand
+				}
+			}
+			LocalResources.busyPoolUsedMem -= memory
 		}
 	}
 }

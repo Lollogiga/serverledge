@@ -113,6 +113,7 @@ var forcePull bool
 var allowApprox bool
 var variantsProfileID string
 var maxEnergy float64
+var shareContainer bool
 
 func Init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
@@ -200,6 +201,13 @@ func Init() {
 		"variants-profile-id",
 		"",
 		"Optional variants profile ID (defaults to function name)",
+	)
+
+	createCmd.Flags().BoolVar(
+		&shareContainer,
+		"shareContainer",
+		false,
+		"Enable container sharing between function and its variants with the same runtime",
 	)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -398,7 +406,8 @@ func create(cmd *cobra.Command, args []string) {
 		CustomImage:     customImage,
 		Signature:       sig,
 
-		AllowApprox: allowApprox,
+		AllowApprox:     allowApprox,
+		ShareContainer:  shareContainer,
 	}
 
 	requestBody, err := json.Marshal(request)
