@@ -12,7 +12,7 @@ import (
 )
 
 const energyEpsilonRatio = 0.05 // 5%
-const worstAccuracyScore = 1e12
+const worstErrorScore = 1e12
 
 func energyEpsilon(budget float64) float64 {
 	return budget * energyEpsilonRatio
@@ -20,7 +20,7 @@ func energyEpsilon(budget float64) float64 {
 
 func energyCostJoule(fn *function.Function, warm bool) (float64, error) {
 	if fn.EnergyProfile == nil {
-		return worstAccuracyScore, errors.New("missing energy profile")
+		return worstErrorScore, errors.New("missing energy profile")
 	}
 
 	includeColdStart := config.GetBool(
@@ -40,7 +40,7 @@ func energyCostJoule(fn *function.Function, warm bool) (float64, error) {
 	return fn.EnergyProfile.InvocationJoule, nil
 }
 
-func accuracyScore(fn *function.Function) float64 {
+func errorScore(fn *function.Function) float64 {
 	if fn.OutputModel == nil {
 		// Legacy o non specificato: trattiamo come esatto
 		return 0.0
@@ -52,7 +52,7 @@ func accuracyScore(fn *function.Function) float64 {
 		if fn.OutputModel.ErrorEstimate != nil {
 			return *fn.OutputModel.ErrorEstimate
 		}
-		return worstAccuracyScore
+		return worstErrorScore
 
 	case "quality":
 		if fn.OutputModel.Quality != nil {
@@ -65,11 +65,11 @@ func accuracyScore(fn *function.Function) float64 {
 				return 2.0
 			}
 		}
-		return worstAccuracyScore
+		return worstErrorScore
 	}
 
 	// Tipo sconosciuto → pessimistico
-	return worstAccuracyScore
+	return worstErrorScore
 }
 
 func SelectEnergyAwareVariant(
@@ -106,7 +106,7 @@ func SelectEnergyAwareVariant(
 		fn       *function.Function
 		warm     bool
 		energy   float64
-		accuracy float64
+		errScore float64
 	}
 
 	var evaluated []evaluatedVariant
@@ -125,14 +125,14 @@ func SelectEnergyAwareVariant(
 			continue
 		}
 
-		// Accuratezza
-		acc := accuracyScore(fn)
+		// Errore stimato
+		errVal := errorScore(fn)
 
 		evaluated = append(evaluated, evaluatedVariant{
 			fn:       fn,
 			warm:     warm,
 			energy:   energy,
-			accuracy: acc,
+			errScore: errVal,
 		})
 	}
 
@@ -153,12 +153,12 @@ func SelectEnergyAwareVariant(
 		for i := 1; i < len(evaluated); i++ {
 			cur := evaluated[i]
 
-			// 1) accuratezza
-			if cur.accuracy < best.accuracy {
+			// 1) errore minore
+			if cur.errScore < best.errScore {
 				best = cur
 				continue
 			}
-			if cur.accuracy > best.accuracy {
+			if cur.errScore > best.errScore {
 				continue
 			}
 
@@ -172,8 +172,8 @@ func SelectEnergyAwareVariant(
 		report.VariantID = best.fn.VariantID
 		report.EstimatedEnergy = best.energy
 		report.WarmHint = best.warm
-		report.AccuracyScore = best.accuracy
-		report.DecisionReason = "accuracy-first"
+		report.ErrorEstimate = best.errScore
+		report.DecisionReason = "error-first"
 
 		return best.fn, report, nil
 	}
@@ -201,12 +201,12 @@ func SelectEnergyAwareVariant(
 	for i := 1; i < len(feasible); i++ {
 		cur := feasible[i]
 
-		// 1) accuratezza
-		if cur.accuracy < best.accuracy {
+		// 1) errore minore
+		if cur.errScore < best.errScore {
 			best = cur
 			continue
 		}
-		if cur.accuracy > best.accuracy {
+		if cur.errScore > best.errScore {
 			continue
 		}
 
@@ -220,7 +220,7 @@ func SelectEnergyAwareVariant(
 	report.VariantID = best.fn.VariantID
 	report.EstimatedEnergy = best.energy
 	report.WarmHint = best.warm
-	report.AccuracyScore = best.accuracy
+	report.ErrorEstimate = best.errScore
 	report.DecisionReason = "energy-budget"
 
 	return best.fn, report, nil

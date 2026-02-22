@@ -51,7 +51,7 @@ type VariantSchedulingReport struct {
 	EstimatedEnergy float64 `json:"estimated_energy_joule,omitempty"`
 	WarmHint        bool    `json:"warm_hint"`
 
-	AccuracyScore  float64 `json:"accuracy_score"`
+	ErrorEstimate  float64 `json:"error_estimate"`
 	DecisionReason string  `json:"decision_reason,omitempty"`
 }
 
