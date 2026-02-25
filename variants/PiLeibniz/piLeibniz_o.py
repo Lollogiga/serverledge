@@ -1,6 +1,9 @@
+# Baseline ottimizzata: target di precisione equivalente a n=1_000_000 iterazioni.
+FIXED_N = 1_000_000
+
+
 def handler(params, context):
-    n = int(params["n"])
-    eps = 1.0 / (2 * n + 1)
+    eps = 1.0 / (2 * FIXED_N + 1)
     return pi_leibniz_approx(eps)
 
 

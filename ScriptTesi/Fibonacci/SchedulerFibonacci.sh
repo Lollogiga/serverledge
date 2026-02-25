@@ -14,6 +14,7 @@ log_info()  { echo -e "${BLUE}[INFO]${RESET}  $1"; }
 log_ok()    { echo -e "${GREEN}[OK]${RESET}    $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${RESET}  $1"; }
 log_error() { echo -e "${RED}[ERROR]${RESET} $1" >&2; }
+sep()       { echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"; }
 
 # =====================================================
 # PERCORSO CLI SERVERLEDGE
@@ -42,14 +43,24 @@ $SERVERLEDGE list 2>/dev/null \
 log_ok "Serverledge functions cleanup completed"
 
 # =====================================================
-# CREATE – SOLO FUNZIONE BASE (VARIANTI AUTO)
+# CREATE – FUNZIONE BASE CON VARIANTI (--approximate)
 # =====================================================
-log_info "Creating Fibonacci base function (approximate enabled)"
+# Il flag --approximate carica automaticamente fibonacci.json
+# dalla directory variants/fibonacci/, registrando le 3 varianti:
+#   base          E=0.000732  Err=0.0  (Python base)
+#   optimization-py E=0.000495  Err=0.0  (Python ottimizzato)
+#   c             E=0.000172  Err=0.0  (nativo C)
+#
+# Poiché tutte le varianti hanno Err=0.0, l'unica Pareto-ottimale
+# è "c" che domina le altre per energia inferiore.
+# Il fronte di Pareto è composto da un SINGOLO punto: caso degenere.
+# =====================================================
+log_info "Creating Fibonacci base function (--approximate)"
 
 $SERVERLEDGE create \
   --function fibonacci \
   --memory 128 \
-  --src ../../examples/Tesi/fibonacci/fibonacci.py \
+  --src ../../variants/fibonacci/fibonacci.py \
   --runtime python310 \
   --handler fibonacci.handler \
   --input "n:Int" \
@@ -61,46 +72,48 @@ log_ok "Fibonacci base function created (variants loaded automatically)"
 sleep 3
 
 # =====================================================
-# INVOKE 1 – LEGACY (NO APPROX)
+# INVOKE 1 – λ=0.0  →  min energia  →  atteso: c
+# Fronte di Pareto = {c} (punto singolo)
+# Qualunque λ porta allo stesso risultato.
 # =====================================================
-log_info "Invoking Fibonacci (legacy, base only)"
-
+sep
+log_info "INVOKE 1 — quality-weight=0.0  (min energia — atteso: c)"
 $SERVERLEDGE invoke \
   --function fibonacci \
-  --param n:10
-
-log_ok "Legacy invocation completed"
+  --param n:10 \
+  --quality-weight 0.0
+log_ok "Invoke 1 completato"
 
 sleep 2
 
 # =====================================================
-# INVOKE 2 – ALLOW APPROX
+# INVOKE 2 – λ=0.5  →  trade-off  →  atteso: c
+# Fronte = {c}: un solo punto, score=0 indipendentemente da λ
 # =====================================================
-log_info "Invoking Fibonacci with allowApprox"
-
+sep
+log_info "INVOKE 2 — quality-weight=0.5  (trade-off — atteso: c)"
 $SERVERLEDGE invoke \
   --function fibonacci \
-  --allowApprox \
-  --param n:10
-
-log_ok "allowApprox invocation completed"
+  --param n:10 \
+  --quality-weight 0.5
+log_ok "Invoke 2 completato"
 
 sleep 2
 
 # =====================================================
-# INVOKE 3 – ALLOW APPROX + BUDGET
+# INVOKE 3 – λ=1.0  →  min errore  →  atteso: c
+# Tutti hanno errore 0, c è comunque il Pareto-ottimale unico
 # =====================================================
-log_info "Invoking Fibonacci with allowApprox + energy budget"
-
+sep
+log_info "INVOKE 3 — quality-weight=1.0  (min errore — atteso: c)"
 $SERVERLEDGE invoke \
   --function fibonacci \
-  --allowApprox \
-  --maxEnergyJoule 0.0000000001 \
-  --param n:10
-
-log_ok "Energy-constrained invocation completed"
+  --param n:10 \
+  --quality-weight 1.0
+log_ok "Invoke 3 completato"
 
 # =====================================================
 # DONE
 # =====================================================
-log_ok "Scheduler Fibonacci workflow completed successfully"
+sep
+log_ok "Scheduler Fibonacci workflow completato."

@@ -17,8 +17,9 @@ type Request struct {
 	Async           bool
 	ReturnOutput    bool
 
-	AllowApprox    bool
-	MaxEnergyJoule *float64
+	// QualityWeight drives Pareto-scalarised variant selection:
+	// 0.0 → minimise energy, 1.0 → minimise error, nil → no variant selection.
+	QualityWeight *float64
 }
 
 type RequestQoS struct {
@@ -39,20 +40,36 @@ type ExecutionReport struct {
 	VariantSchedulingReport *VariantSchedulingReport `json:"variant_scheduling,omitempty"`
 }
 
+// ParetoPoint holds the key metrics for one variant on the Pareto front,
+// enabling external tools to reconstruct Pareto-front charts.
+type ParetoPoint struct {
+	FunctionName  string  `json:"function_name"`
+	VariantID     string  `json:"variant_id,omitempty"`
+	Energy        float64 `json:"energy_joule"`
+	ErrorEstimate float64 `json:"error_estimate"`
+	NormEnergy    float64 `json:"norm_energy"`
+	NormError     float64 `json:"norm_error"`
+	Score         float64 `json:"score"`
+}
+
 type VariantSchedulingReport struct {
 	LogicalName      string `json:"logical_name,omitempty"`
 	InvokedFunction  string `json:"invoked_function,omitempty"`
 	SelectedFunction string `json:"selected_function,omitempty"`
 	VariantID        string `json:"variant_id,omitempty"`
 
-	AllowApprox    bool    `json:"allow_approx"`
-	MaxEnergyJoule float64 `json:"max_energy_joule,omitempty"`
+	// QualityWeight used during this invocation (0 = min energy, 1 = min error).
+	QualityWeight float64 `json:"quality_weight"`
 
 	EstimatedEnergy float64 `json:"estimated_energy_joule,omitempty"`
 	WarmHint        bool    `json:"warm_hint"`
 
 	ErrorEstimate  float64 `json:"error_estimate"`
 	DecisionReason string  `json:"decision_reason,omitempty"`
+
+	// ParetoFront contains all Pareto-optimal variants considered during
+	// selection; useful for plotting energy/error trade-off charts.
+	ParetoFront []ParetoPoint `json:"pareto_front,omitempty"`
 }
 
 type Response struct {

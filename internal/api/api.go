@@ -83,9 +83,8 @@ func InvokeFunction(c echo.Context) error {
 	r.Async = invocationRequest.Async
 	r.ReturnOutput = invocationRequest.ReturnOutput
 
-	// Energy-aware fields
-	r.AllowApprox = invocationRequest.AllowApprox
-	r.MaxEnergyJoule = invocationRequest.MaxEnergyJoule
+	// Pareto-scalarised variant selection
+	r.QualityWeight = invocationRequest.QualityWeight
 
 	reqId := fmt.Sprintf(
 		"%s-%s-%d",
@@ -125,8 +124,8 @@ func InvokeFunction(c echo.Context) error {
 			return c.String(http.StatusTooManyRequests, "Node out of resources")
 		}
 
-		// Caso errore di policy energetica
-		if r.AllowApprox && r.MaxEnergyJoule != nil {
+		// Caso errore di variant selection
+		if r.QualityWeight != nil {
 
 			log.Printf("Invocation rejected by energy policy: %v\n", err)
 

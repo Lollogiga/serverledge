@@ -6,10 +6,10 @@
       "entry_point": "piLeibniz.handler",
       "src": "piLeibniz.py",
       "energy": {
-        "cold_start_joule": 0.069905000,
-        "invocation_joule": 0.001194734
+        "cold_start_joule": 0.070134,
+        "invocation_joule": 0.007750000
       },
-      "output":{
+      "output": {
         "type": "error",
         "error_estimate": 0.0
       },
@@ -18,32 +18,122 @@
     {
       "id": "optimization-py",
       "runtime": "python310",
-      "entry_point": "fibonacci_o.handler",
+      "entry_point": "piLeibniz_o.handler",
       "src": "piLeibniz_o.py",
       "energy": {
-        "cold_start_joule": 0.069710526,
-        "invocation_joule": 0.001189474
+        "cold_start_joule": 0.069412,
+        "invocation_joule": 0.007400000
       },
-      "output":{
-        "type": "error",
-        "error_estimate": 1.99960008e-8
-      },
-      "is_approximate": true
-    },
-    {
-      "id": "c",
-      "runtime": "native",
-      "entry_point": "fibonacci",
-      "src": "piLeibniz",
-      "energy": {
-        "cold_start_joule": 0.008652632,
-        "invocation_joule": 0.000207368
-      },
-      "output":{
+      "output": {
         "type": "error",
         "error_estimate": 0.0
       },
       "is_approximate": false
+    },
+    {
+      "id": "c",
+      "runtime": "native",
+      "entry_point": "piLeibniz_base",
+      "src": "piLeibniz_base",
+      "energy": {
+        "cold_start_joule": 0.008847,
+        "invocation_joule": 0.001037000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0
+      },
+      "is_approximate": false
+    },
+    {
+      "id": "n1000",
+      "runtime": "python310",
+      "entry_point": "piLeibniz_n1000.handler",
+      "src": "piLeibniz_n1000.py",
+      "energy": {
+        "cold_start_joule": 0.070681,
+        "invocation_joule": 0.000200000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.001000
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n5000",
+      "runtime": "python310",
+      "entry_point": "piLeibniz_n5000.handler",
+      "src": "piLeibniz_n5000.py",
+      "energy": {
+        "cold_start_joule": 0.068973,
+        "invocation_joule": 0.000300000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.000200
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n10000",
+      "runtime": "python310",
+      "entry_point": "piLeibniz_n10000.handler",
+      "src": "piLeibniz_n10000.py",
+      "energy": {
+        "cold_start_joule": 0.070318,
+        "invocation_joule": 0.000430000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.000100
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n50000",
+      "runtime": "python310",
+      "entry_point": "piLeibniz_n50000.handler",
+      "src": "piLeibniz_n50000.py",
+      "energy": {
+        "cold_start_joule": 0.069156,
+        "invocation_joule": 0.000800000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.000015
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n100000",
+      "runtime": "python310",
+      "entry_point": "piLeibniz_n100000.handler",
+      "src": "piLeibniz_n100000.py",
+      "energy": {
+        "cold_start_joule": 0.071203,
+        "invocation_joule": 0.001150000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.000008
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n200000",
+      "runtime": "python310",
+      "entry_point": "piLeibniz_n200000.handler",
+      "src": "piLeibniz_n200000.py",
+      "energy": {
+        "cold_start_joule": 0.069587,
+        "invocation_joule": 0.001550000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.000003
+      },
+      "is_approximate": true
     }
   ]
 }

@@ -95,9 +95,9 @@ func SubmitRequest(r *function.Request) (*function.ExecutionReport, error) {
 	// =====================================================
 	// Energy-aware variant selection (OPT-IN)
 	// =====================================================
-	if r != nil && r.AllowApprox {
+	if r != nil && r.QualityWeight != nil {
 
-		selectedFn, schedReport, err := SelectEnergyAwareVariant(r)
+		selectedFn, schedReport, err := SelectParetoVariant(r)
 
 		// Logghiamo SEMPRE il report di scheduling
 		schedRequest.ExecutionReport.VariantSchedulingReport = schedReport

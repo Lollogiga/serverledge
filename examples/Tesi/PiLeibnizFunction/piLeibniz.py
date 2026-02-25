@@ -1,6 +1,9 @@
+# Baseline: n molto grande → errore trascurabile (≈ 2e-7), considerato esatto.
+FIXED_N = 1_000_000
+
+
 def handler(params, context):
-    n = params["n"]
-    return ''.join(pi_leibniz(int(n)))
+    return pi_leibniz(FIXED_N)
 
 
 def pi_leibniz(n):
@@ -14,13 +17,10 @@ def pi_leibniz(n):
     s = 0.0
     sign = 1.0
     denom = 1.0
-    count = 0
 
-    while count < n:
+    for _ in range(n):
         s += sign / denom
         sign = -sign
         denom += 2.0
-        count += 1
 
-    pi_val = 4.0 * s
-    return str(pi_val)
+    return str(4.0 * s)

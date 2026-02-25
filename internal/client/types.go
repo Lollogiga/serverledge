@@ -13,9 +13,9 @@ type InvocationRequest struct {
 	Async           bool
 	ReturnOutput    bool
 
-	//New fields
-	AllowApprox    bool     `json:"allowApprox"`
-	MaxEnergyJoule *float64 `json:"maxEnergyJoule,omitempty"`
+	// QualityWeight drives Pareto-scalarised variant selection:
+	// 0.0 → minimise energy, 1.0 → minimise error, nil → no variant selection.
+	QualityWeight *float64 `json:"qualityWeight,omitempty"`
 }
 
 type PrewarmingRequest struct {
