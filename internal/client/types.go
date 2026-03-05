@@ -12,10 +12,9 @@ type InvocationRequest struct {
 	CanDoOffloading bool
 	Async           bool
 	ReturnOutput    bool
-
-	// QualityWeight drives Pareto-scalarised variant selection:
-	// 0.0 → minimise energy, 1.0 → minimise error, nil → no variant selection.
-	QualityWeight *float64 `json:"qualityWeight,omitempty"`
+	// CIZoneOverride sovrascrive la zona ElectricityMaps per questa singola invocazione.
+	// Se vuoto, viene usata la zona da serverledge-conf.yaml.
+	CIZoneOverride string `json:"ci_zone_override,omitempty"`
 }
 
 type PrewarmingRequest struct {

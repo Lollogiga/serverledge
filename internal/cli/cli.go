@@ -112,8 +112,8 @@ var prewarmCount int64
 var forcePull bool
 var allowApprox bool
 var variantsProfileID string
-var qualityWeight float64
 var shareContainer bool
+var ciZoneOverride string
 
 func Init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
@@ -128,11 +128,11 @@ func Init() {
 	invokeCmd.Flags().StringVarP(&paramsFile, "params_file", "j", "", "File containing parameters (JSON)")
 	invokeCmd.Flags().BoolVarP(&asyncInvocation, "async", "a", false, "Asynchronous invocation")
 	invokeCmd.Flags().BoolVarP(&returnOutput, "ret_output", "o", false, "Capture function output (if supported by used runtime)")
-	invokeCmd.Flags().Float64Var(
-		&qualityWeight,
-		"quality-weight",
-		-1.0,
-		"Pareto quality weight [0,1]: 0=minimise energy, 1=minimise error; omit (or set to -1) to skip Pareto variant selection",
+	invokeCmd.Flags().StringVar(
+		&ciZoneOverride,
+		"ci-zone",
+		"",
+		"Sovrascrive la zona ElectricityMaps per questa invocazione (es. IT-NO, DE, PL). Se omesso usa serverledge-conf.yaml",
 	)
 
 	rootCmd.AddCommand(createCmd)
@@ -258,13 +258,6 @@ func invoke(cmd *cobra.Command, _ []string) {
 			os.Exit(1)
 		}
 	}
-	// Build optional QualityWeight pointer (nil = no Pareto variant selection)
-	var qwPtr *float64
-	if qualityWeight >= 0.0 && qualityWeight <= 1.0 {
-		qw := qualityWeight
-		qwPtr = &qw
-	}
-
 	// Prepare request
 	request := client.InvocationRequest{
 		Params:          paramsMap,
@@ -273,8 +266,7 @@ func invoke(cmd *cobra.Command, _ []string) {
 		CanDoOffloading: true,
 		ReturnOutput:    returnOutput,
 		Async:           asyncInvocation,
-
-		QualityWeight: qwPtr,
+		CIZoneOverride:  ciZoneOverride,
 	}
 	invocationBody, err := json.Marshal(request)
 	if err != nil {

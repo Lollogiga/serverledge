@@ -115,20 +115,21 @@ func paretoFilter(candidates []evaluatedVariant) []evaluatedVariant {
 
 // SelectParetoVariant selects the best variant using Pareto-scalarisation.
 //
-// The caller passes QualityWeight λ ∈ [0,1]:
-//   - λ = 0 → minimise energy
-//   - λ = 1 → minimise error
-//   - 0 < λ < 1 → weighted trade-off
+// λ ∈ (0,1) is computed automatically from the real-time grid carbon intensity
+// (ElectricityMaps API, cached 15 min):
+//   - clean grid (low CI)  → λ → 1  (prioritise accuracy)
+//   - dirty grid (high CI) → λ → 0  (prioritise energy saving)
 //
 // Steps:
-//  1. Evaluate all registered variants (energy + error).
-//  2. Retain only Pareto-optimal variants (non-dominated w.r.t. energy & error).
-//  3. Normalise energy and error on the Pareto front.
-//  4. Compute score(i) = (1−λ)·E_n(i) + λ·Err_n(i).
-//  5. Return the variant with the lowest score.
+//  1. Fetch λ and raw CI from ElectricityMaps (or use cached value).
+//  2. Evaluate all registered variants (energy + error).
+//  3. Retain only Pareto-optimal variants (non-dominated w.r.t. energy & error).
+//  4. Normalise energy and error on the Pareto front.
+//  5. Compute score(i) = (1−λ)·E_n(i) + λ·Err_n(i).
+//  6. Return the variant with the lowest score.
 //
-// The full Pareto front (with normalised values and scores) is embedded in the
-// returned VariantSchedulingReport so callers can plot energy/error charts.
+// The full Pareto front plus λ and CI are embedded in the returned
+// VariantSchedulingReport and surfaced in the invocation JSON response.
 func SelectParetoVariant(
 	r *function.Request,
 ) (*function.Function, *function.VariantSchedulingReport, error) {
@@ -138,12 +139,16 @@ func SelectParetoVariant(
 	}
 
 	base := r.Fun
-	lambda := *r.QualityWeight // guaranteed non-nil by caller
+
+	// λ is derived automatically from the current carbon intensity.
+	// r.CIZoneOverride (se non vuoto) sovrascrive la zona da config per questa invocazione.
+	lambda, ci := GetLambdaAndCI(r.CIZoneOverride)
 
 	report := &function.VariantSchedulingReport{
-		LogicalName:     base.LogicalName,
-		InvokedFunction: base.Name,
-		QualityWeight:   lambda,
+		LogicalName:         base.LogicalName,
+		InvokedFunction:     base.Name,
+		QualityWeight:       lambda,
+		CarbonIntensityGCO2: ci,
 	}
 
 	// ------------------------------------------------------------------

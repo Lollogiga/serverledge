@@ -17,9 +17,9 @@ type Request struct {
 	Async           bool
 	ReturnOutput    bool
 
-	// QualityWeight drives Pareto-scalarised variant selection:
-	// 0.0 → minimise energy, 1.0 → minimise error, nil → no variant selection.
-	QualityWeight *float64
+	// CIZoneOverride, se non vuoto, sostituisce la zona letta da config
+	// solo per questa invocazione (utile per test multi-zona).
+	CIZoneOverride string
 }
 
 type RequestQoS struct {
@@ -58,8 +58,12 @@ type VariantSchedulingReport struct {
 	SelectedFunction string `json:"selected_function,omitempty"`
 	VariantID        string `json:"variant_id,omitempty"`
 
-	// QualityWeight used during this invocation (0 = min energy, 1 = min error).
+	// QualityWeight (λ) used during this invocation, derived from CarbonIntensityGCO2.
 	QualityWeight float64 `json:"quality_weight"`
+
+	// CarbonIntensityGCO2 is the grid carbon intensity (gCO2eq/kWh) read from
+	// ElectricityMaps at the moment of this invocation (0 if unavailable).
+	CarbonIntensityGCO2 float64 `json:"carbon_intensity_gco2,omitempty"`
 
 	EstimatedEnergy float64 `json:"estimated_energy_joule,omitempty"`
 	WarmHint        bool    `json:"warm_hint"`

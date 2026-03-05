@@ -82,9 +82,8 @@ func InvokeFunction(c echo.Context) error {
 	r.CanDoOffloading = invocationRequest.CanDoOffloading
 	r.Async = invocationRequest.Async
 	r.ReturnOutput = invocationRequest.ReturnOutput
-
-	// Pareto-scalarised variant selection
-	r.QualityWeight = invocationRequest.QualityWeight
+	r.CIZoneOverride = invocationRequest.CIZoneOverride
+	// Note: Pareto λ is now derived automatically from Carbon Intensity — no user input needed.
 
 	reqId := fmt.Sprintf(
 		"%s-%s-%d",
@@ -124,21 +123,13 @@ func InvokeFunction(c echo.Context) error {
 			return c.String(http.StatusTooManyRequests, "Node out of resources")
 		}
 
-		// Caso errore di variant selection
-		if r.QualityWeight != nil {
-
-			log.Printf("Invocation rejected by energy policy: %v\n", err)
-
-			// executionReport può essere nil
-			var schedReport *function.VariantSchedulingReport
-			if executionReport != nil {
-				schedReport = executionReport.VariantSchedulingReport
-			}
-
-			return c.JSON(http.StatusUnprocessableEntity, map[string]interface{}{
+		// Caso errore di variant selection (loggato con dettaglio se disponibile)
+		if executionReport != nil && executionReport.VariantSchedulingReport != nil {
+			log.Printf("Variant selection error: %v\n", err)
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"success":            false,
 				"error":              err.Error(),
-				"variant_scheduling": schedReport,
+				"variant_scheduling": executionReport.VariantSchedulingReport,
 			})
 		}
 

@@ -1,0 +1,13 @@
+# ---------------------------------------------------------------------------
+# ElectricityMaps — Carbon-Intensity-based λ auto-calculation
+#
+# Variant selection usa λ derivato dalla carbon intensity della rete locale:
+#   rete pulita (CI bassa) → λ → 1  (priorità all'accuratezza)
+#   rete sporca (CI alta)  → λ → 0  (priorità al risparmio energetico)
+#
+# In alternativa: export ELECTRICITY_MAPS_TOKEN=<token>
+# ---------------------------------------------------------------------------
+electricitymaps:
+  zone: "DE"            # Zona ElectricityMaps del nodo (es. IT, DE, FR, NO-NO1)
+                           # Commentare per auto-detect via IP pubblico (solo produzione)
+  token: "03VH0VHUU9MGMJFCYoc6" # oppure: export ELECTRICITY_MAPS_TOKEN=<token>

@@ -93,9 +93,11 @@ func SubmitRequest(r *function.Request) (*function.ExecutionReport, error) {
 	}
 
 	// =====================================================
-	// Energy-aware variant selection (OPT-IN)
+	// Energy-aware variant selection (automatica via Carbon Intensity)
+	// Eseguita solo per funzioni che hanno varianti registrate
+	// (identificate da un LogicalName non vuoto).
 	// =====================================================
-	if r != nil && r.QualityWeight != nil {
+	if r != nil && r.Fun != nil && r.Fun.LogicalName != "" {
 
 		selectedFn, schedReport, err := SelectParetoVariant(r)
 
@@ -103,9 +105,8 @@ func SubmitRequest(r *function.Request) (*function.ExecutionReport, error) {
 		schedRequest.ExecutionReport.VariantSchedulingReport = schedReport
 
 		if err != nil {
-			// Vincolo energetico NON soddisfatto
-			// → niente esecuzione, niente scheduling legacy
-			return nil, err
+			// Errore interno nella variant selection
+			return schedRequest.ExecutionReport, err
 		}
 
 		if selectedFn != nil {

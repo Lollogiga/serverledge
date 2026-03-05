@@ -99,6 +99,22 @@ const WORKFLOW_OFFLOADING_POLICY_ILP_OBJ_WEIGHT_VIOLATIONS = "workflow.offloadin
 const WORKFLOW_OFFLOADING_POLICY_ILP_OBJ_WEIGHT_DATA_TRANSFERS = "workflow.offloading.policy.ilp.obj.data"
 const WORKFLOW_OFFLOADING_POLICY_ILP_OBJ_WEIGHT_COST = "workflow.offloading.policy.ilp.obj.cost"
 
+// ---------------------------------------------------------------------------
+// ElectricityMaps — Carbon-Intensity-based lambda auto-calculation
+// ---------------------------------------------------------------------------
+
+// ElectricityMaps zone identifier (e.g. "IT-NO", "DE", "FR").
+// If empty, the API will attempt auto-detection from the caller's IP
+// (works only when the node has a routable public IP address;
+//  set this explicitly when running in a simulator or private network).
+const ELECTRICITY_MAPS_ZONE = "electricitymaps.zone"
+
+// ElectricityMaps API auth token.
+// Can also be supplied via the ELECTRICITY_MAPS_TOKEN environment variable
+// as a fallback for production deployments where the token must not be
+// committed to version-controlled config files.
+const ELECTRICITY_MAPS_TOKEN = "electricitymaps.token"
+
 // Estimated bandwidth between the current node and the data store
 const WORKFLOW_OFFLOADING_POLICY_NODE_TO_DATA_STORE_BANDWIDTH = "workflow.offloading.policy.node2datastore.bandwidth"
 
