@@ -309,13 +309,26 @@ func DeleteFunction(c echo.Context) error {
 		return err
 	}
 
-	_, ok := function.GetFunction(f.Name) // TODO: we would need a system-wide lock here...
+	base, ok := function.GetFunction(f.Name) // TODO: we would need a system-wide lock here...
 	if !ok {
 		log.Printf("Dropping request for non existing function '%s'\n", f.Name)
 		return c.String(http.StatusNotFound, "Unknown function")
 	}
 
-	log.Printf("New request: deleting %s\n", f.Name)
+	// Collect all variants BEFORE deleting from etcd, so we can shut down
+	// their warm containers afterwards. If we called GetFunctionsByLogicalName
+	// after DeleteLogicalFunction the index would already be gone.
+	var allVariants []*function.Function
+	if base.LogicalName != "" {
+		allVariants, _ = function.GetFunctionsByLogicalName(base.LogicalName)
+	}
+	if len(allVariants) == 0 {
+		allVariants = []*function.Function{base}
+	}
+
+	log.Printf("New request: deleting %s (logical=%s, %d variants)\n",
+		f.Name, base.LogicalName, len(allVariants))
+
 	err = function.DeleteLogicalFunction(f.Name)
 	if err != nil {
 		log.Printf("Failed deletion: %v\n", err)
@@ -327,8 +340,13 @@ func DeleteFunction(c echo.Context) error {
 		return c.String(http.StatusServiceUnavailable, "")
 	}
 
-	// Delete local warm containers
-	node.ShutdownWarmContainersFor(&f)
+	// Shut down warm containers for every variant, not just the base.
+	// Without this, idle containers remain in the pool and could be
+	// reused by a subsequent invocation even though etcd has no record
+	// of the function anymore.
+	for _, fn := range allVariants {
+		node.ShutdownWarmContainersFor(fn)
+	}
 
 	response := struct{ Deleted string }{f.Name}
 	return c.JSON(http.StatusOK, response)

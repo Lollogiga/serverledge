@@ -168,48 +168,100 @@ L'algoritmo si articola in cinque passi, implementati in
         Si restituisce la variante con \textbf{score minimo}.
 \end{enumerate}
 
-\subsection{Perché si usa solo l'energia di invocazione}\label{sec:coldstart}
+\subsection{Energia effettiva: cold-start condizionale}\label{sec:coldstart}
 
-Il costo di cold-start ($C_{\text{cs}}$) è il tempo/energia necessario
-per avviare un nuovo container quando non è disponibile un'istanza
-calda.  Esso dipende dall'\emph{ambiente di esecuzione} (runtime
-Python, runtime C/Alpine) ed è \emph{transitorio}: per le invocazioni
-successive (\emph{warm start}) non vengono sostenuti.
+Il costo di cold-start ($C_{\text{cs}}$) è l'energia necessaria per
+avviare un nuovo container quando non è disponibile un'istanza calda.
+A differenza di quanto ipotizzato inizialmente, questo costo
+\emph{non viene ignorato} nella comparazione Pareto: il criterio
+adottato è che la valutazione rifletta il \textbf{costo reale}
+dell'invocazione imminente.
 
-Se si includesse $C_{\text{cs}}$ nella comparazione Pareto, il runtime
-C dominerebbe sistematicamente quello Python ($C_{\text{cs,C}} \approx
-0.008\,\text{J}$ contro $C_{\text{cs,Py}} \approx 0.069\,\text{J}$),
-anche quando le varianti Python approssimate sono più economiche in
-invocazione.  L'obiettivo del fronte di Pareto è confrontare le
-proprietà \emph{algoritmiche} delle varianti, non il costo della
-piattaforma.
+\begin{equation}\label{eq:effective}
+  E_i^{\text{eff}} =
+  \begin{cases}
+    E_i^{\text{inv}} & \text{se esiste un container caldo per la variante } i \\
+    C_{\text{cs},i} + E_i^{\text{inv}} & \text{altrimenti (cold start)}
+  \end{cases}
+\end{equation}
 
-\subsection{Implementazione Go}
+Il fronte di Pareto è quindi \emph{state-dependent}: dipende da quali
+container sono in esecuzione al momento dell'invocazione.  Una variante
+che risulterebbe dominata se fosse cold può diventare Pareto-ottimale
+una volta che il suo container è già caldo, e viceversa.
 
-\begin{lstlisting}[style=go, caption={Filtro Pareto --- \texttt{variant\_selection.go}}]
-func paretoFilter(candidates []evaluatedVariant) []evaluatedVariant {
-    n := len(candidates)
-    dominated := make([]bool, n)
+\paragraph{Effetto pratico.}
+Nel caso di PiLeibniz, le varianti Python in cold-start pagano
+$C_{\text{cs,Py}} \approx 0.069{-}0.071\,\text{J}$, che domina di
+gran lunga il costo di invocazione ($\sim 0.0002{-}0.008\,\text{J}$).
+Al contrario, la variante C ha $C_{\text{cs,C}} \approx 0.009\,\text{J}$.
+Il fronte di Pareto \emph{a freddo} può quindi differire
+sostanzialmente da quello \emph{a caldo}, incentivando il riuso
+dei container come meccanismo di risparmio energetico.
 
-    for i := 0; i < n; i++ {
-        for j := 0; j < n; j++ {
-            if i == j { continue }
-            ci, cj := candidates[i], candidates[j]
-            // j domina i se >= su entrambi e < su almeno uno
-            if cj.energy <= ci.energy && cj.errScore <= ci.errScore &&
-               (cj.energy < ci.energy || cj.errScore < ci.errScore) {
-                dominated[i] = true
-                break
-            }
-        }
-    }
-    var pareto []evaluatedVariant
-    for i, v := range candidates {
-        if !dominated[i] { pareto = append(pareto, v) }
-    }
-    return pareto
-}
-\end{lstlisting}
+\subsection{Algoritmo di filtro: sort + scan in $O(n \log n)$}
+
+L'implementazione adotta un algoritmo ottimale per il caso a 2 obiettivi,
+che riduce la complessità da $O(n^2)$ (doppio ciclo naive) a
+$O(n \log n)$.
+
+L'intuizione chiave è che la relazione di dominanza, su due assi,
+può essere sfruttata dopo un ordinamento: se l'insieme è già
+ordinate per energia crescente, un punto può essere dominato
+solo da un punto che lo precede nell'ordinamento (che ha quindi
+energia $\le$). Questo riduce il controllo di dominanza a
+un semplice confronto sull'asse residuo.
+
+\paragraph{Passo 1 --- Ordinamento.}
+I candidati vengono ordinati per $E$ crescente.
+A parità di $E$, si ordina per $\varepsilon$ crescente: tra due
+varianti con identica energia, quella con errore maggiore è
+automaticamente dominata dall'altra, quindi viene processata
+\emph{dopo} e sarà scartata al passo successivo.
+
+\paragraph{Passo 2 --- Scansione singola.}
+Si percorre la lista ordinata da sinistra a destra mantenendo una
+variabile $\varepsilon_{\min}$, inizializzata a $+\infty$, che
+registra il \_minimo errore visto finora sul fronte.
+
+Un punto $p$ è Pareto-ottimale se e solo se
+$\varepsilon_p < \varepsilon_{\min}$.
+
+\textit{Perché è corretto}: tutti i punti già processati hanno
+$E \le E_p$ (per la proprietà dell'ordinamento).
+Se esistesse un punto precedente $q$ che domina $p$, si avrebbe
+$E_q \le E_p$ e $\varepsilon_q \le \varepsilon_p$, con almeno uno
+stretto. Poiché $E_q \le E_p$ è già garantito, la condizione di
+dominanza si riduce a $\varepsilon_q \le \varepsilon_p$.
+L'unica configurazione in cui $p$ \emph{non} è dominato è quindi
+$\varepsilon_p < \varepsilon_{\min}$: nessun punto precedente ha
+errore $\le \varepsilon_p$.
+
+\paragraph{Esempio su PiLeibniz.}
+Dopo ordinamento per $E$ crescente, la scansione procede:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}lrrrrc@{}}
+\toprule
+Variante & $E$ (J) & $\varepsilon$ & $\varepsilon_{\min}$ pre & $\varepsilon_p < \varepsilon_{\min}$? & Fronte \\
+\midrule
+n1000   & 0.000200 & 0.001000  & $+\infty$ & \checkmark & \checkmark \\
+n5000   & 0.000300 & 0.000200  & 0.001000  & \checkmark & \checkmark \\
+n10000  & 0.000430 & 0.000100  & 0.000200  & \checkmark & \checkmark \\
+n50000  & 0.000800 & 0.000015  & 0.000100  & \checkmark & \checkmark \\
+c       & 0.001037 & 0.000000  & 0.000015  & \checkmark & \checkmark \\
+n100000 & 0.001150 & 0.000008  & 0.000000  & $\times$   & --- \\
+n200000 & 0.001550 & 0.000003  & 0.000000  & $\times$   & --- \\
+opt-py  & 0.007400 & 0.000000  & 0.000000  & $\times$   & --- \\
+base    & 0.007750 & 0.000000  & 0.000000  & $\times$   & --- \\
+\bottomrule
+\end{tabular}
+\caption{Traccia dell'algoritmo sort+scan su PiLeibniz. Le ultime 4 righe
+         vengono scartate perché $\varepsilon_{\min}$ è già 0 dopo \texttt{c}.
+         Il risultato è identico all'algoritmo naive $O(n^2)$.}
+\end{table}
 
 \begin{lstlisting}[style=go, caption={Scalarizzazione --- \texttt{SelectParetoVariant()}}]
 for _, v := range pareto {

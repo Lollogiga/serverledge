@@ -13,12 +13,19 @@ sep()  { echo -e "${YELLOW}━━━━━━━━━━━━━━━━━�
 # CLEANUP
 # ─────────────────────────────────────────────────────────────
 log "Cleaning existing Serverledge functions"
+
 $SERVERLEDGE list 2>/dev/null \
-  | tr -d '[]",' | sed 's/^[[:space:]]*//' | sed '/^$/d' \
+  | tr -d '[]",' \
+  | sed 's/^[[:space:]]*//' \
+  | sed '/^$/d' \
   | while read -r fn; do
-      log "Deleting function: $fn"
-      $SERVERLEDGE delete --function "$fn" || true
+      if [[ "$fn" != *"-"* ]]; then
+          log "Deleting function: $fn"
+          $SERVERLEDGE delete --function "$fn" || true
+      fi
+
     done
+
 ok "Cleanup completed"
 
 # ─────────────────────────────────────────────────────────────
@@ -33,24 +40,63 @@ $SERVERLEDGE create \
   --memory 128 \
   --input "n:Int" \
   --output "y:Float" \
-  --approximate
+  --approximate \
+  --shareContainer
 ok "PiLeibniz created — 9 varianti caricate da variants/PiLeibniz/"
 
 sleep 2
 
 # ─────────────────────────────────────────────────────────────
+# INVOKE 0 – λ=qualsiasi  →  Caso degenere  →  atteso: c
+# ─────────────────────────────────────────────────────────────
+sep
+log "INVOKE 0 — quality-weight=0.0  (caso degenere — atteso: c)"
+$SERVERLEDGE invoke \
+  --function PiLeibniz \
+  --quality-weight 0.0
+ok "Invoke 1 completato"
+
+
+# ─────────────────────────────────────────────────────────────
+# PREWARM – 1 container per runtime (grazie a --shareContainer)
+#
+# Con --shareContainer la chiave del pool NON è il nome della
+# variante ma  LogicalName:Runtime, quindi:
+#
+#   pool["PiLeibniz:python310"] ← condiviso da n1000/n5000/n10000/n50000/base/opt-py
+#   pool["PiLeibniz:native"]    ← condiviso da c
+#
+# Basta pre-warmare UNA variante per runtime per scaldare l'intero
+# pool condiviso. Le altre varianti dello stesso runtime troveranno
+# il container già idle e pagheranno solo invocation_joule.
+# Quando una variante diversa prende il container condiviso,
+# UpdateContainerCode() inietta il suo codice nel container warm —
+# nessun cold start, solo I/O di copia file.
+# ─────────────────────────────────────────────────────────────
+sep
+log "Prewarming pool python310 (tramite PiLeibniz-n1000)..."
+$SERVERLEDGE prewarm --function PiLeibniz-n1000 --count 1
+ok "  pool PiLeibniz:python310 → 1 container warm"
+
+log "Prewarming pool native (tramite PiLeibniz-c)..."
+$SERVERLEDGE prewarm --function PiLeibniz-c --count 1
+ok "  pool PiLeibniz:native → 1 container warm"
+
+sleep 3
+
+# ─────────────────────────────────────────────────────────────
 # Varianti nel JSON (9 totali):
-#   Pareto-ottimali attese:
-#     n1000   E=0.000200  Err=0.001000
-#     n5000   E=0.000300  Err=0.000200
-#     n10000  E=0.000430  Err=0.000100
-#     n50000  E=0.000800  Err=0.000015
-#     c       E=0.001037  Err=0.000000
+#   Pareto-ottimali (pre-warmate sopra):
+#     n1000   E=0.000196  Err=0.001000
+#     n5000   E=0.000308  Err=0.000200
+#     n10000  E=0.000421  Err=0.000100
+#     n50000  E=0.000817  Err=0.000015
+#     c       E=0.001052  Err=0.000000
 #   Dominate (escluse dall'algoritmo):
-#     n100000   E=0.001150  Err=0.000008  ← dominata da c
-#     n200000   E=0.001550  Err=0.000003  ← dominata da c
-#     base      E=0.007750  Err=0.000000  ← dominata da c
-#     opt-py    E=0.007400  Err=0.000000  ← dominata da c
+#     n100000   E=0.001163  Err=0.000008  ← dominata da c
+#     n200000   E=0.001534  Err=0.000003  ← dominata da c
+#     base      E=0.007823  Err=0.000000  ← dominata da c
+#     opt-py    E=0.007318  Err=0.000000  ← dominata da c
 # ─────────────────────────────────────────────────────────────
 
 # ─────────────────────────────────────────────────────────────
@@ -104,10 +150,30 @@ sleep 2
 # score(c)     =0.8*1.000 +0.2*0.000=0.800
 # ─────────────────────────────────────────────────────────────
 sep
-log "INVOKE 4 — quality-weight=0.2  (lieve peso errore — atteso: n5000)"
+log "INVOKE 4 — quality-weight=0.854  (atteso: n50000)"
+$SERVERLEDGE invoke \
+  --function PiLeibniz \
+  --quality-weight 0.854
+ok "Invoke 4 completato"
+
+sep
+ok "SchedulingPiLiebniz completato."
+
+sep
+log "INVOKE 5 — quality-weight=0.2  (atteso: n5000)"
 $SERVERLEDGE invoke \
   --function PiLeibniz \
   --quality-weight 0.2
+ok "Invoke 4 completato"
+
+sep
+ok "SchedulingPiLiebniz completato."
+
+sep
+log "INVOKE 6 — quality-weight=0.57  (atteso: n10000)"
+$SERVERLEDGE invoke \
+  --function PiLeibniz \
+  --quality-weight 0.57
 ok "Invoke 4 completato"
 
 sep

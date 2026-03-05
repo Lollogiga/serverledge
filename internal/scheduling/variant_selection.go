@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/serverledge-faas/serverledge/internal/config"
@@ -72,29 +73,37 @@ type evaluatedVariant struct {
 
 // paretoFilter returns only the Pareto-optimal variants under the pair of
 // objectives (energy, error), both minimised.
+//
+// Algorithm: O(n log n) sort + single-pass scan (optimal for 2 objectives).
+//
+//  1. Sort candidates by energy ascending; ties broken by errScore ascending
+//     so that among equal-energy points the one with lower error dominates.
+//  2. Walk left to right tracking errMin = minimum errScore on the front so far.
+//     A point is Pareto-optimal iff its errScore is STRICTLY less than errMin:
+//     all previously seen points have energy ≤ current, so the only escape
+//     from domination is a strictly lower error.
 func paretoFilter(candidates []evaluatedVariant) []evaluatedVariant {
-	n := len(candidates)
-	dominated := make([]bool, n)
-
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			if i == j {
-				continue
-			}
-			ci, cj := candidates[i], candidates[j]
-			// j weakly dominates i on both axes and strictly on at least one
-			if cj.energy <= ci.energy && cj.errScore <= ci.errScore &&
-				(cj.energy < ci.energy || cj.errScore < ci.errScore) {
-				dominated[i] = true
-				break
-			}
-		}
+	if len(candidates) == 0 {
+		return nil
 	}
 
+	// Step 1 – sort
+	sorted := make([]evaluatedVariant, len(candidates))
+	copy(sorted, candidates)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].energy != sorted[j].energy {
+			return sorted[i].energy < sorted[j].energy
+		}
+		return sorted[i].errScore < sorted[j].errScore
+	})
+
+	// Step 2 – single scan
 	var pareto []evaluatedVariant
-	for i, v := range candidates {
-		if !dominated[i] {
+	errMin := math.MaxFloat64
+	for _, v := range sorted {
+		if v.errScore < errMin {
 			pareto = append(pareto, v)
+			errMin = v.errScore
 		}
 	}
 	return pareto
@@ -151,26 +160,28 @@ func SelectParetoVariant(
 	// ------------------------------------------------------------------
 	// 2. Evaluate every variant
 	// ------------------------------------------------------------------
-	// NOTE: Pareto comparison uses invocation-only (warm) energy because
-	// cold-start cost is a transient runtime effect, not an intrinsic
-	// property of the variant's algorithm. Using cold-start would let the
-	// runtime platform (native vs python) dominate over algorithmic trade-offs.
+	// Energy cost used for Pareto ranking reflects the *actual* cost the
+	// scheduler would pay at this moment:
+	//   - warm container available → invocation_joule only
+	//   - no warm container       → cold_start_joule + invocation_joule
+	// This makes the Pareto front state-dependent: a variant that is cold
+	// right now carries a higher effective energy and may be dominated by
+	// a warm variant it would otherwise beat. The front is always computed
+	// on the real cost of the upcoming invocation.
 	var evaluated []evaluatedVariant
 	for _, fn := range variants {
 		if fn == nil {
 			continue
 		}
 		warm := node.HasWarmContainer(fn)
-		// Always use invocation energy for Pareto ranking; cold-start is
-		// accounted for separately in the actual scheduling path.
-		invocationEnergy, err := energyCostJoule(fn, true /* warm=true → invocation only */)
+		effectiveEnergy, err := energyCostJoule(fn, warm)
 		if err != nil {
 			continue // skip variants without an energy profile
 		}
 		evaluated = append(evaluated, evaluatedVariant{
 			fn:       fn,
 			warm:     warm,
-			energy:   invocationEnergy,
+			energy:   effectiveEnergy,
 			errScore: errorScore(fn),
 		})
 	}

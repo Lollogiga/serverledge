@@ -7,7 +7,7 @@
       "src": "piLeibniz.py",
       "energy": {
         "cold_start_joule": 0.070134,
-        "invocation_joule": 0.007750000
+        "invocation_joule": 0.007823
       },
       "output": {
         "type": "error",
@@ -22,7 +22,7 @@
       "src": "piLeibniz_o.py",
       "energy": {
         "cold_start_joule": 0.069412,
-        "invocation_joule": 0.007400000
+        "invocation_joule": 0.007318
       },
       "output": {
         "type": "error",
@@ -37,7 +37,7 @@
       "src": "piLeibniz_base",
       "energy": {
         "cold_start_joule": 0.008847,
-        "invocation_joule": 0.001037000
+        "invocation_joule": 0.001052
       },
       "output": {
         "type": "error",
@@ -52,11 +52,11 @@
       "src": "piLeibniz_n1000.py",
       "energy": {
         "cold_start_joule": 0.070681,
-        "invocation_joule": 0.000200000
+        "invocation_joule": 0.000196
       },
       "output": {
         "type": "error",
-        "error_estimate": 0.001000
+        "error_estimate": 0.001999
       },
       "is_approximate": true
     },
@@ -67,11 +67,11 @@
       "src": "piLeibniz_n5000.py",
       "energy": {
         "cold_start_joule": 0.068973,
-        "invocation_joule": 0.000300000
+        "invocation_joule": 0.000308
       },
       "output": {
         "type": "error",
-        "error_estimate": 0.000200
+        "error_estimate": 0.000400
       },
       "is_approximate": true
     },
@@ -82,11 +82,11 @@
       "src": "piLeibniz_n10000.py",
       "energy": {
         "cold_start_joule": 0.070318,
-        "invocation_joule": 0.000430000
+        "invocation_joule": 0.000421
       },
       "output": {
         "type": "error",
-        "error_estimate": 0.000100
+        "error_estimate": 0.000200
       },
       "is_approximate": true
     },
@@ -97,11 +97,11 @@
       "src": "piLeibniz_n50000.py",
       "energy": {
         "cold_start_joule": 0.069156,
-        "invocation_joule": 0.000800000
+        "invocation_joule": 0.000817
       },
       "output": {
         "type": "error",
-        "error_estimate": 0.000015
+        "error_estimate": 0.000040
       },
       "is_approximate": true
     },
@@ -112,11 +112,11 @@
       "src": "piLeibniz_n100000.py",
       "energy": {
         "cold_start_joule": 0.071203,
-        "invocation_joule": 0.001150000
+        "invocation_joule": 0.001163
       },
       "output": {
         "type": "error",
-        "error_estimate": 0.000008
+        "error_estimate": 0.000020
       },
       "is_approximate": true
     },
@@ -127,11 +127,11 @@
       "src": "piLeibniz_n200000.py",
       "energy": {
         "cold_start_joule": 0.069587,
-        "invocation_joule": 0.001550000
+        "invocation_joule": 0.001534
       },
       "output": {
         "type": "error",
-        "error_estimate": 0.000003
+        "error_estimate": 0.000010
       },
       "is_approximate": true
     }
