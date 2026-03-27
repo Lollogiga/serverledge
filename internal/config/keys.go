@@ -106,7 +106,8 @@ const WORKFLOW_OFFLOADING_POLICY_ILP_OBJ_WEIGHT_COST = "workflow.offloading.poli
 // ElectricityMaps zone identifier (e.g. "IT-NO", "DE", "FR").
 // If empty, the API will attempt auto-detection from the caller's IP
 // (works only when the node has a routable public IP address;
-//  set this explicitly when running in a simulator or private network).
+//
+//	set this explicitly when running in a simulator or private network).
 const ELECTRICITY_MAPS_ZONE = "electricitymaps.zone"
 
 // ElectricityMaps API auth token.
@@ -114,6 +115,11 @@ const ELECTRICITY_MAPS_ZONE = "electricitymaps.zone"
 // as a fallback for production deployments where the token must not be
 // committed to version-controlled config files.
 const ELECTRICITY_MAPS_TOKEN = "electricitymaps.token"
+
+// Path to the CSV file with pre-computed per-zone sigmoid parameters
+// (ci_mid, s) derived from historical carbon-intensity data.
+// Default: "zone_ci_params.csv" (next to the Serverledge binary).
+const ELECTRICITY_MAPS_PARAMS_FILE = "electricitymaps.params_file"
 
 // Estimated bandwidth between the current node and the data store
 const WORKFLOW_OFFLOADING_POLICY_NODE_TO_DATA_STORE_BANDWIDTH = "workflow.offloading.policy.node2datastore.bandwidth"
@@ -129,4 +135,27 @@ const WORKFLOW_THRESHOLD_BASED_POLICY_MAX_OFFLOADED = "workflow.offloading.polic
 
 const (
 	SchedulingEnergyIncludeColdStart = "scheduling.energy.include_coldstart"
+
+	// ---------------------------------------------------------------------------
+	// UCB (Upper Confidence Bound) exploration in Pareto variant selection
+	// ---------------------------------------------------------------------------
+
+	// Exploration strength β for the LCB (Lower Confidence Bound) energy estimate.
+	// A higher value promotes exploration of variants with few observations.
+	// Default: 1.0. Set to 0 to disable UCB and use the etcd energy profile only.
+	SchedulingUCBBeta = "scheduling.ucb.beta"
+
+	// Minimum number of InfluxDB energy samples required before the UCB
+	// estimate is used. Variants with fewer samples fall back to the
+	// etcd energy profile value.  Default: 5.
+	SchedulingUCBMinSamples = "scheduling.ucb.min_samples"
+
+	// ---------------------------------------------------------------------------
+	// InfluxDB connection — used by the energy writer and UCB query.
+	// Can also be set via INFLUX_URL, INFLUX_TOKEN, INFLUX_ORG, INFLUX_BUCKET env vars.
+	// ---------------------------------------------------------------------------
+	InfluxURL    = "influx.url"
+	InfluxToken  = "influx.token"
+	InfluxOrg    = "influx.org"
+	InfluxBucket = "influx.bucket"
 )

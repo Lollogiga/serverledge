@@ -9,7 +9,7 @@
         "cold_start_joule": 0.106473674,
         "invocation_joule": 0.000526316
       },
-      "output":{
+      "output": {
         "type": "error",
         "error_estimate": 0.0
       },
@@ -24,9 +24,24 @@
         "cold_start_joule": 0.100578947,
         "invocation_joule": 0.000421053
       },
-      "output":{
+      "output": {
         "type": "error",
         "error_estimate": 0.04
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "chebyshev",
+      "runtime": "python310",
+      "entry_point": "VectorMagnitudeChebyshev.handler",
+      "src": "VectorMagnitudeChebyshev.py",
+      "energy": {
+        "cold_start_joule": 0.096000000,
+        "invocation_joule": 0.000360000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.29
       },
       "is_approximate": true
     }

@@ -44,6 +44,21 @@
         "error_estimate": 0.0
       },
       "is_approximate": false
+    },
+    {
+      "id": "binet",
+      "runtime": "python310",
+      "entry_point": "fibonacci_binet.handler",
+      "src": "fibonacci_binet.py",
+      "energy": {
+        "cold_start_joule": 0.050000,
+        "invocation_joule": 0.000148000
+      },
+      "output":{
+        "type": "error",
+        "error_estimate": 0.001
+      },
+      "is_approximate": true
     }
   ]
 }

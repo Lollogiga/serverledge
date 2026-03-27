@@ -9,11 +9,41 @@
         "cold_start_joule": 0.039147368,
         "invocation_joule": 0.000452632
       },
-      "output":{
+      "output": {
         "type": "error",
         "error_estimate": 0.0
       },
       "is_approximate": false
+    },
+    {
+      "id": "newton-2",
+      "runtime": "python310",
+      "entry_point": "Sqrt_newton2.handler",
+      "src": "Sqrt_newton2.py",
+      "energy": {
+        "cold_start_joule": 0.036000000,
+        "invocation_joule": 0.000410000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.001
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "newton-1",
+      "runtime": "python310",
+      "entry_point": "Sqrt_newton1.handler",
+      "src": "Sqrt_newton1.py",
+      "energy": {
+        "cold_start_joule": 0.034000000,
+        "invocation_joule": 0.000370000
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.02
+      },
+      "is_approximate": true
     },
     {
       "id": "Light",
@@ -24,7 +54,7 @@
         "cold_start_joule": 0.034963158,
         "invocation_joule": 0.000336842
       },
-      "output":{
+      "output": {
         "type": "error",
         "error_estimate": 0.04266
       },

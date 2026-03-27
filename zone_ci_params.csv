@@ -1,0 +1,18 @@
+# Parametri sigmoide per zona — generati da carbon_lambda_analysis.py
+# Colonne: zone, ci_mid (media storica gCO2/kWh), s (fattore di scala P5/P95), k (pendenza sigmoide)
+# Formula: s = (P95 - P5) / (2 * ln((1-alpha)/alpha))  con alpha=0.01
+# k è opzionale: se omesso viene usato il valore di default ciK=0.45
+#
+# Aggiungere nuove zone eseguendo:
+#   python ScriptTesi/carbon_lambda_analysis.py <file.csv> --zone <ZONA> --k <valore>
+# e copiare qui la riga CSV stampata a terminale.
+#
+# NOTA: IT e GB sono valori placeholder — aggiornare con dati reali!
+zone,ci_mid,s,k
+DE,277.94,41.3874,0.45
+ES,95.14,13.5014,0.45
+FR,13.81,3.8693,0.45
+NO,6.01,1.0348,0.45
+PL,498.52,35.2756,0.45
+IT,290.00,45.0000,0.45
+GB,175.00,27.0000,0.45

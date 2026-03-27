@@ -3,10 +3,10 @@ package influx
 import (
 	"context"
 	"log"
-	"os"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
+	"github.com/serverledge-faas/serverledge/internal/config"
 )
 
 type Writer struct {
@@ -15,13 +15,13 @@ type Writer struct {
 }
 
 func NewWriter() (*Writer, error) {
-	client := newClient() // Assicurati che newClient sia definito correttamente nel tuo package
+	client := newClient()
 	if client == nil {
 		return nil, ErrInfluxNotConfigured
 	}
 
-	org := os.Getenv("INFLUX_ORG")
-	bucket := os.Getenv("INFLUX_BUCKET")
+	org := resolveInfluxParam(config.InfluxOrg, "INFLUX_ORG")
+	bucket := resolveInfluxParam(config.InfluxBucket, "INFLUX_BUCKET")
 
 	if org == "" || bucket == "" {
 		return nil, ErrInfluxNotConfigured

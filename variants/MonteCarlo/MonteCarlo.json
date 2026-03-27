@@ -1,0 +1,100 @@
+{
+  "variants": [
+    {
+      "id": "n1000",
+      "runtime": "python310",
+      "entry_point": "montecarlo_n1000.handler",
+      "src": "montecarlo_n1000.py",
+      "energy": {
+        "cold_start_joule": 0.07,
+        "invocation_joule": 0.00112217,
+        "measured": true
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.052
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n5000",
+      "runtime": "python310",
+      "entry_point": "montecarlo_n5000.handler",
+      "src": "montecarlo_n5000.py",
+      "energy": {
+        "cold_start_joule": 0.07,
+        "invocation_joule": 0.001123289,
+        "measured": true
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0232
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n10000",
+      "runtime": "python310",
+      "entry_point": "montecarlo_n10000.handler",
+      "src": "montecarlo_n10000.py",
+      "energy": {
+        "cold_start_joule": 0.07,
+        "invocation_joule": 0.002022962,
+        "measured": true
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0164
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n50000",
+      "runtime": "python310",
+      "entry_point": "montecarlo_n50000.handler",
+      "src": "montecarlo_n50000.py",
+      "energy": {
+        "cold_start_joule": 0.07,
+        "invocation_joule": 0.014307896,
+        "measured": true
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.00735
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n100000",
+      "runtime": "python310",
+      "entry_point": "montecarlo_n100000.handler",
+      "src": "montecarlo_n100000.py",
+      "energy": {
+        "cold_start_joule": 0.07,
+        "invocation_joule": 0.137954755,
+        "measured": true
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0052
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n500000",
+      "runtime": "python310",
+      "entry_point": "montecarlo_n500000.handler",
+      "src": "montecarlo_n500000.py",
+      "energy": {
+        "cold_start_joule": 0.07,
+        "invocation_joule": 0.005198887,
+        "measured": true
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.00232
+      },
+      "is_approximate": true
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "variants": [
     {
-      "id": "base",
+      "id": "vit-base",
       "runtime": "python-ml",
       "entry_point": "ImageClassification.handler",
       "src": "ImageClassification.py",
@@ -11,12 +11,29 @@
       },
       "output": {
         "type": "quality",
-        "quality": "high"
+        "quality": "high",
+        "quality_score": 0.818
       },
       "is_approximate": false
     },
     {
-      "id": "Light",
+      "id": "efficientnet-b0",
+      "runtime": "python-ml",
+      "entry_point": "ImageClassificationEfficientNetB0.handler",
+      "src": "ImageClassificationEfficientNetB0.py",
+      "energy": {
+        "cold_start_joule": 1.2,
+        "invocation_joule": 0.45
+      },
+      "output": {
+        "type": "quality",
+        "quality": "medium-high",
+        "quality_score": 0.771
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "mobilenet-v2",
       "runtime": "python-ml",
       "entry_point": "ImageClassificationLight.handler",
       "src": "ImageClassificationLight.py",
@@ -26,7 +43,24 @@
       },
       "output": {
         "type": "quality",
-        "quality": "low"
+        "quality": "medium-low",
+        "quality_score": 0.718
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "mobilenet-v2-tiny",
+      "runtime": "python-ml",
+      "entry_point": "ImageClassificationMobileNetTiny.handler",
+      "src": "ImageClassificationMobileNetTiny.py",
+      "energy": {
+        "cold_start_joule": 0.8,
+        "invocation_joule": 0.08
+      },
+      "output": {
+        "type": "quality",
+        "quality": "low",
+        "quality_score": 0.603
       },
       "is_approximate": true
     }

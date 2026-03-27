@@ -1,14 +1,17 @@
 package scheduling
 
 import (
+	"context"
 	"errors"
 	"log"
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/serverledge-faas/serverledge/internal/config"
 	"github.com/serverledge-faas/serverledge/internal/function"
+	"github.com/serverledge-faas/serverledge/internal/influx"
 	"github.com/serverledge-faas/serverledge/internal/node"
 )
 
@@ -45,14 +48,27 @@ func errorScore(fn *function.Function) float64 {
 		}
 		return worstErrorScore
 	case "quality":
+		// Prefer numeric quality_score when available: error = 1 - accuracy.
+		// This gives a precise, continuous metric instead of a coarse ordinal label.
+		if fn.OutputModel.QualityScore != nil {
+			s := *fn.OutputModel.QualityScore
+			if s < 0 {
+				s = 0
+			}
+			if s > 1 {
+				s = 1
+			}
+			return 1.0 - s
+		}
+		// Legacy ordinal fallback ("high"→0, "medium"→0.5, "low"→1).
 		if fn.OutputModel.Quality != nil {
 			switch strings.ToLower(*fn.OutputModel.Quality) {
 			case "high":
 				return 0.0
 			case "medium":
-				return 1.0
+				return 0.5
 			case "low":
-				return 2.0
+				return 1.0
 			}
 		}
 		return worstErrorScore
@@ -65,10 +81,70 @@ func errorScore(fn *function.Function) float64 {
 // ---------------------------------------------------------------------------
 
 type evaluatedVariant struct {
-	fn       *function.Function
-	warm     bool
-	energy   float64
-	errScore float64
+	fn         *function.Function
+	warm       bool
+	energy     float64
+	errScore   float64
+	ucbUsed    bool  // true if LCB adjusted the energy estimate
+	ucbSamples int64 // number of InfluxDB samples used
+}
+
+// energyCostJouleUCB returns the Lower Confidence Bound (LCB) energy estimate
+// for UCB exploration. The LCB formula is:
+//
+//	LCB = µ - β · σ / √n
+//
+// where µ, σ, n are derived from historical InfluxDB measurements.
+// Being optimistic about energy (assuming it could be lower) drives the
+// scheduler to explore under-sampled variants.
+//
+// Falls back to the etcd energy profile when:
+//   - InfluxDB is not configured or unavailable
+//   - the variant has fewer than minSamples observations
+//   - beta == 0 (UCB disabled)
+func energyCostJouleUCB(
+	fn *function.Function,
+	warm bool,
+	beta float64,
+	minSamples int,
+) (joule float64, usedUCB bool, sampleCount int64, err error) {
+
+	base, baseErr := energyCostJoule(fn, warm)
+	if baseErr != nil {
+		return 0, false, 0, baseErr
+	}
+	if fn.VariantID == "" || beta <= 0 {
+		return base, false, 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	// fn.Name matches the function_name tag in InfluxDB (e.g. "montecarlo-n1000")
+	stats, queryErr := influx.QueryEnergyStats(ctx, fn.Name, "24h")
+	if queryErr != nil {
+		// InfluxDB unavailable — silent fallback to etcd value
+		if queryErr != influx.ErrInfluxNotConfigured {
+			log.Printf("[ucb] influx query error for %s: %v (using etcd fallback)", fn.Name, queryErr)
+		}
+		return base, false, 0, nil
+	}
+	if stats.Count < int64(minSamples) {
+		log.Printf("[ucb] variant=%s has %d/%d samples — using etcd value (exploration deferred)",
+			fn.VariantID, stats.Count, minSamples)
+		return base, false, stats.Count, nil
+	}
+
+	// LCB: optimistic lower bound for energy minimisation
+	lcb := stats.Mean - beta*stats.Stddev/math.Sqrt(float64(stats.Count))
+	if lcb < 0 {
+		lcb = 0
+	}
+
+	log.Printf("[ucb] variant=%s  µ=%.6f  σ=%.6f  n=%d  β=%.2f  LCB=%.6f  etcd=%.6f",
+		fn.VariantID, stats.Mean, stats.Stddev, stats.Count, beta, lcb, base)
+
+	return lcb, true, stats.Count, nil
 }
 
 // paretoFilter returns only the Pareto-optimal variants under the pair of
@@ -163,31 +239,38 @@ func SelectParetoVariant(
 	log.Printf("[pareto] logical=%s found %d candidates", base.LogicalName, len(variants))
 
 	// ------------------------------------------------------------------
-	// 2. Evaluate every variant
+	// 2. Evaluate every variant (with optional UCB energy estimate)
 	// ------------------------------------------------------------------
 	// Energy cost used for Pareto ranking reflects the *actual* cost the
 	// scheduler would pay at this moment:
 	//   - warm container available → invocation_joule only
 	//   - no warm container       → cold_start_joule + invocation_joule
-	// This makes the Pareto front state-dependent: a variant that is cold
-	// right now carries a higher effective energy and may be dominated by
-	// a warm variant it would otherwise beat. The front is always computed
-	// on the real cost of the upcoming invocation.
+	//
+	// When UCB is enabled (beta > 0), the energy is replaced by the Lower
+	// Confidence Bound derived from InfluxDB history:
+	//   LCB = µ - β·σ/√n
+	// This promotes exploration of under-sampled variants (optimism under
+	// uncertainty), embodying the UCB acquisition function principle.
+	ucbBeta := config.GetFloat(config.SchedulingUCBBeta, 1.0)
+	ucbMinSamples := config.GetInt(config.SchedulingUCBMinSamples, 5)
+
 	var evaluated []evaluatedVariant
 	for _, fn := range variants {
 		if fn == nil {
 			continue
 		}
 		warm := node.HasWarmContainer(fn)
-		effectiveEnergy, err := energyCostJoule(fn, warm)
+		effectiveEnergy, ucbUsed, ucbSamples, err := energyCostJouleUCB(fn, warm, ucbBeta, ucbMinSamples)
 		if err != nil {
 			continue // skip variants without an energy profile
 		}
 		evaluated = append(evaluated, evaluatedVariant{
-			fn:       fn,
-			warm:     warm,
-			energy:   effectiveEnergy,
-			errScore: errorScore(fn),
+			fn:         fn,
+			warm:       warm,
+			energy:     effectiveEnergy,
+			errScore:   errorScore(fn),
+			ucbUsed:    ucbUsed,
+			ucbSamples: ucbSamples,
 		})
 	}
 
@@ -236,6 +319,7 @@ func SelectParetoVariant(
 	var bestV evaluatedVariant
 	bestScore := math.MaxFloat64
 
+	var ucbAnyActive bool
 	paretoPoints := make([]function.ParetoPoint, 0, len(pareto))
 	for _, v := range pareto {
 		var normE, normErr float64
@@ -248,14 +332,20 @@ func SelectParetoVariant(
 
 		score := (1-lambda)*normE + lambda*normErr
 
+		if v.ucbUsed {
+			ucbAnyActive = true
+		}
+
 		paretoPoints = append(paretoPoints, function.ParetoPoint{
-			FunctionName:  v.fn.Name,
-			VariantID:     v.fn.VariantID,
-			Energy:        v.energy,
-			ErrorEstimate: v.errScore,
-			NormEnergy:    normE,
-			NormError:     normErr,
-			Score:         score,
+			FunctionName:   v.fn.Name,
+			VariantID:      v.fn.VariantID,
+			Energy:         v.energy,
+			ErrorEstimate:  v.errScore,
+			NormEnergy:     normE,
+			NormError:      normErr,
+			Score:          score,
+			UCBExploration: v.ucbUsed,
+			UCBSampleCount: v.ucbSamples,
 		})
 
 		if score < bestScore {
@@ -274,6 +364,7 @@ func SelectParetoVariant(
 	report.ErrorEstimate = bestV.errScore
 	report.DecisionReason = "pareto-scalarisation"
 	report.ParetoFront = paretoPoints
+	report.UCBActive = ucbAnyActive
 
 	log.Printf("[pareto] selected=%s  λ=%.2f  score=%.4f  E=%.6f  Err=%.6f",
 		report.SelectedFunction, lambda, bestScore, bestV.energy, bestV.errScore)

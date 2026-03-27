@@ -11,3 +11,24 @@ electricitymaps:
   zone: "DE"            # Zona ElectricityMaps del nodo (es. IT, DE, FR, NO-NO1)
                            # Commentare per auto-detect via IP pubblico (solo produzione)
   token: "03VH0VHUU9MGMJFCYoc6" # oppure: export ELECTRICITY_MAPS_TOKEN=<token>
+  params_file: "zone_ci_params.csv" # parametri sigmoide per zona
+
+# ---------------------------------------------------------------------------
+# UCB (Upper Confidence Bound) exploration in Pareto variant selection
+# ---------------------------------------------------------------------------
+scheduling:
+  ucb:
+    beta: 1.0          # Forza esplorazione β: valori alti → più esplorazione.
+                       # Impostare a 0 per disabilitare UCB (solo exploitation).
+    min_samples: 5     # Campioni minimi InfluxDB prima di usare la stima UCB;
+                       # varianti con meno campioni usano il profilo etcd.
+
+# ---------------------------------------------------------------------------
+# InfluxDB connection — used for energy writing and UCB variant selection.
+# Alternatively set INFLUX_URL / INFLUX_TOKEN / INFLUX_ORG / INFLUX_BUCKET env vars.
+# ---------------------------------------------------------------------------
+influx:
+  url:    "http://localhost:8086"
+  token:  "serverledge-token"
+  org:    "serverledge"
+  bucket: "serverledge-energy"

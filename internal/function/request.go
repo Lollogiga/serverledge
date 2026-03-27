@@ -50,6 +50,10 @@ type ParetoPoint struct {
 	NormEnergy    float64 `json:"norm_energy"`
 	NormError     float64 `json:"norm_error"`
 	Score         float64 `json:"score"`
+
+	// UCB fields (populated when UCB exploration is active)
+	UCBExploration bool  `json:"ucb_exploration,omitempty"`  // true if LCB adjusted the energy
+	UCBSampleCount int64 `json:"ucb_sample_count,omitempty"` // InfluxDB samples used
 }
 
 type VariantSchedulingReport struct {
@@ -74,6 +78,10 @@ type VariantSchedulingReport struct {
 	// ParetoFront contains all Pareto-optimal variants considered during
 	// selection; useful for plotting energy/error trade-off charts.
 	ParetoFront []ParetoPoint `json:"pareto_front,omitempty"`
+
+	// UCBActive is true when at least one variant's energy estimate was
+	// adjusted by the UCB/LCB formula during this scheduling decision.
+	UCBActive bool `json:"ucb_active,omitempty"`
 }
 
 type Response struct {

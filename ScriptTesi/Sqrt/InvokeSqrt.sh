@@ -9,24 +9,12 @@ SERVERLEDGE="../../bin/serverledge-cli"
 
 VALUE=987654321.123
 
-# =====================================================
-# INVOKE LIGHT
-# =====================================================
-
-log_info "Invoking SqrtLight-py"
-$SERVERLEDGE invoke \
-  --function SqrtLight-py \
-  --param n:${VALUE}
-log_ok "SqrtLight-py done"
-
-# =====================================================
-# INVOKE BASE
-# =====================================================
-
-log_info "Invoking Sqrt-py"
-$SERVERLEDGE invoke \
-  --function Sqrt-py \
-  --param n:${VALUE}
-log_ok "Sqrt-py done"
+for VARIANT in Sqrt-base Sqrt-newton2 Sqrt-newton1 Sqrt-light; do
+  log_info "Invoking ${VARIANT} with n=${VALUE}"
+  $SERVERLEDGE invoke \
+    --function "${VARIANT}" \
+    --param n:${VALUE}
+  log_ok "${VARIANT} done"
+done
 
 
