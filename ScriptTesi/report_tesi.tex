@@ -1,0 +1,744 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{geometry}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{parskip}
+
+\geometry{a4paper, top=2.5cm, bottom=2.5cm, left=3cm, right=3cm}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  keepspaces=true,
+  frame=single,
+  backgroundcolor=\color{gray!8},
+  xleftmargin=0.5em,
+  xrightmargin=0.5em,
+}
+
+\title{\textbf{Report}\\[0.4em]
+\large Schedulazione Green-Aware di Funzioni Serverless\\
+tramite Selezione di Varianti Pareto-Ottimale con Esplorazione UCB}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+% ======================================================================
+\section{Motivazione}
+% ======================================================================
+
+Il paradigma FaaS su infrastrutture edge introduce una tensione fondamentale tra due
+obiettivi in conflitto:
+
+\begin{enumerate}
+  \item \textbf{Precisione del risultato} --- l'utente si aspetta output corretti o di
+    alta qualità.
+  \item \textbf{Consumo energetico} --- il nodo edge ha risorse limitate e opera in un
+    contesto in cui il costo ambientale dell'energia varia nel tempo a seconda della
+    quota di rinnovabili disponibile nella rete elettrica locale.
+\end{enumerate}
+
+Per molte funzioni esistono \textit{varianti approssimate} che producono risultati
+leggermente meno precisi ma richiedono meno energia computazionale. Un sistema
+green-aware dovrebbe scegliere automaticamente la variante più adeguata al contesto
+corrente: privilegiare l'accuratezza quando la rete è alimentata da fonti rinnovabili,
+e risparmiare energia quando l'intensità di carbonio è elevata.
+
+Il presente lavoro estende Serverledge con tre meccanismi coordinati:
+
+\begin{enumerate}
+  \item \textbf{Selezione di varianti Pareto-ottimale} guidata da un parametro
+    $\lambda$ derivato dall'intensità di carbonio della rete elettrica locale
+    (API ElectricityMaps).
+  \item \textbf{Funzione sigmoide parametrizzata per zona geografica}, con parametri
+    pre-calcolati offline da dati storici.
+  \item \textbf{Esplorazione UCB (Upper Confidence Bound)} che promuove la valutazione
+    di varianti poco osservate, raffinando le stime energetiche con dati reali raccolti
+    da InfluxDB.
+\end{enumerate}
+
+% ======================================================================
+\section{Funzioni Utilizzate}
+% ======================================================================
+
+Il sistema è stato valutato su sei funzioni raggruppate in due famiglie:
+
+\begin{itemize}
+  \item \textbf{Funzioni numeriche} (PiLeibniz, LnHarmonic, MonteCarlo): output
+    quantificabile, errore misurato come scarto relativo dal valore esatto.
+  \item \textbf{Funzioni ML} (SentimentAnalysis, ImageClassification, SpamDetection):
+    output di classificazione, qualità misurata come accuracy su benchmark di
+    riferimento.
+\end{itemize}
+
+\noindent\textit{$\star$ = variante approssimata sul fronte di Pareto.}
+
+% -----------------------------
+\subsection{PiLeibniz}
+% -----------------------------
+
+Stima $\pi$ tramite la serie di Leibniz con $N$ termini:
+\[
+  \frac{\pi}{4} = \sum_{k=0}^{N-1} \frac{(-1)^k}{2k+1}
+\]
+Maggiore è $N$, più accurata è la stima ma maggiore è il costo computazionale.
+È la funzione con la frontiera di Pareto più ricca (nove varianti che coprono tre ordini
+di grandezza in energia ed errore).
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Variante} & \textbf{N termini} & \textbf{Energia (J)} &
+\textbf{Errore rel.} & \textbf{Appross.} \\
+\midrule
+\texttt{base}          & adattivo & 0.007823 & $0.0$              & No \\
+\texttt{optimization-py} & adattivo & 0.007318 & $0.0$            & No \\
+\texttt{c}             & adattivo & 0.001052 & $0.0$              & No \\
+\texttt{n200000} $\star$ & 200\,000 & 0.001534 & $1.0\times10^{-5}$ & Sì \\
+\texttt{n100000} $\star$ & 100\,000 & 0.001163 & $2.0\times10^{-5}$ & Sì \\
+\texttt{n50000}  $\star$ &  50\,000 & 0.000817 & $4.0\times10^{-5}$ & Sì \\
+\texttt{n10000}  $\star$ &  10\,000 & 0.000421 & $2.0\times10^{-4}$ & Sì \\
+\texttt{n5000}   $\star$ &   5\,000 & 0.000308 & $4.0\times10^{-4}$ & Sì \\
+\texttt{n1000}   $\star$ &   1\,000 & 0.000196 & $2.0\times10^{-3}$ & Sì \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -----------------------------
+\subsection{LnHarmonic}
+% -----------------------------
+
+Stima $\ln(2)$ tramite la serie armonica alternante con $N$ termini:
+\[
+  \ln(2) = \sum_{k=1}^{N} \frac{(-1)^{k+1}}{k}
+         = 1 - \frac{1}{2} + \frac{1}{3} - \frac{1}{4} + \ldots
+\]
+Struttura analoga a PiLeibniz: il parametro $N$ bilancia accuratezza e consumo
+energetico.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Variante} & \textbf{N termini} & \textbf{Energia (J)} &
+\textbf{Errore rel.} & \textbf{Appross.} \\
+\midrule
+\texttt{base}          & adattivo & 0.007700 & $0.0$              & No \\
+\texttt{n200000} $\star$ & 200\,000 & 0.001534 & $3.6\times10^{-6}$ & Sì \\
+\texttt{n100000} $\star$ & 100\,000 & 0.001163 & $7.2\times10^{-6}$ & Sì \\
+\texttt{n50000}  $\star$ &  50\,000 & 0.000817 & $2.9\times10^{-5}$ & Sì \\
+\texttt{n10000}  $\star$ &  10\,000 & 0.000421 & $1.4\times10^{-4}$ & Sì \\
+\texttt{n5000}   $\star$ &   5\,000 & 0.000308 & $2.9\times10^{-4}$ & Sì \\
+\texttt{n1000}   $\star$ &   1\,000 & 0.000196 & $1.4\times10^{-3}$ & Sì \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -----------------------------
+\subsection{MonteCarlo}
+% -----------------------------
+
+Stima $\pi$ col metodo Monte Carlo: genera $N$ punti casuali in $[0,1]^2$ e conta
+quanti cadono nel cerchio unitario. L'errore statistico cala come $O(1/\sqrt{N})$.
+Tutte le varianti sono approssimate (l'algoritmo è intrinsecamente stocastico); il
+fronte di Pareto copre l'intero set.
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Variante} & \textbf{N campioni} & \textbf{Energia (J)} &
+\textbf{Errore rel.} & \textbf{Appross.} \\
+\midrule
+\texttt{n1000}   $\star$ &   1\,000 & 0.000147 & 0.0520 & Sì \\
+\texttt{n5000}   $\star$ &   5\,000 & 0.000912 & 0.0232 & Sì \\
+\texttt{n10000}  $\star$ &  10\,000 & 0.002023 & 0.0164 & Sì \\
+\texttt{n50000}  $\star$ &  50\,000 & 0.014308 & 0.0074 & Sì \\
+\texttt{n100000} $\star$ & 100\,000 & 0.033710 & 0.0052 & Sì \\
+\texttt{n500000} $\star$ & 500\,000 & 0.231480 & 0.0023 & Sì \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -----------------------------
+\subsection{SentimentAnalysis}
+% -----------------------------
+
+Classifica un testo in input come \textbf{POSITIVE} o \textbf{NEGATIVE}
+(classificazione binaria). Le varianti sono modelli Transformer di dimensioni
+decrescenti più un classificatore lessicale (VADER/AFINN) come variante ultra-light.
+Qualità stimata su benchmark SST-2.
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{2.2cm}p{5.8cm}cccc}
+\toprule
+\textbf{Variante} & \textbf{Modello} & \textbf{Params} &
+\textbf{Energia (J)} & \textbf{Qualità} & \textbf{Appross.} \\
+\midrule
+\texttt{roberta-large} & siebert/sentiment-roberta-large    & 355 M & 0.0916 & Alta        & No \\
+\texttt{distilbert} $\star$ & distilbert-base-uncased-sst-2 &  67 M & 0.0387 & Media       & Sì \\
+\texttt{bert-tiny}  $\star$ & mrm8488/bert-tiny-sst2        &   4 M & 0.0113 & Media-bassa & Sì \\
+\texttt{vader}      $\star$ & AFINN lexicon (Python puro)   &  ---  & 0.0024 & Bassa       & Sì \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -----------------------------
+\subsection{ImageClassification}
+% -----------------------------
+
+Classifica un'immagine in input (Base64) tra 1000 categorie ImageNet, restituendo la
+categoria predetta e il confidence score. Le varianti sono architetture Transformer/CNN
+di dimensioni decrescenti. Qualità indicata come Top-1 accuracy su ImageNet.
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{2.8cm}p{5.5cm}cccc}
+\toprule
+\textbf{Variante} & \textbf{Modello} & \textbf{Params} &
+\textbf{Energia (J)} & \textbf{Qualità} & \textbf{Appross.} \\
+\midrule
+\texttt{vit-base}          & google/vit-base-patch16-224       & 86 M  & 1.4553 & Alta        & No \\
+\texttt{efficientnet-b0} $\star$ & google/efficientnet-b0      & 5.3 M & 0.4180 & Media       & Sì \\
+\texttt{mobilenet-v2}    $\star$ & google/mobilenet\_v2\_1.0\_224 & 3.4 M & 0.2289 & Media-bassa & Sì \\
+\texttt{mobilenet-v2-tiny} $\star$ & google/mobilenet\_v2\_0.35\_224 & 1.7 M & 0.0770 & Bassa  & Sì \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% -----------------------------
+\subsection{SpamDetection}
+% -----------------------------
+
+Classifica un messaggio (email, SMS) come \textbf{SPAM} o \textbf{HAM}
+(classificazione binaria). Le varianti spaziano da modelli Transformer fine-tuned per
+spam detection fino a un classificatore euristico basato su keyword. Qualità stimata
+su corpus misti (Enron + SMS Spam Collection + phishing samples).
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{p{2.2cm}p{6.0cm}cccc}
+\toprule
+\textbf{Variante} & \textbf{Modello} & \textbf{Params} &
+\textbf{Energia (J)} & \textbf{Qualità} & \textbf{Appross.} \\
+\midrule
+\texttt{roberta-spam}  & mshenoda/roberta-spam                         & 125 M & 0.0850 & Alta        & No \\
+\texttt{distilbert} $\star$ & Falconsai/spam\_classification            &  67 M & 0.0350 & Media       & Sì \\
+\texttt{bert-tiny}  $\star$ & mrm8488/bert-tiny-finetuned-sms-spam     & 4.4 M & 0.0100 & Media-bassa & Sì \\
+\texttt{keyword}    $\star$ & Keyword heuristic (Python puro)           &  ---  & 0.0020 & Bassa       & Sì \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ======================================================================
+\section{Esplorazione UCB}
+% ======================================================================
+
+\subsection{Motivazione}
+
+Il profilo energetico offline di ogni variante (\texttt{invocation\_joule} nel JSON di
+configurazione) è ottenuto eseguendo ripetutamente le varianti su un hardware di
+riferimento e registrando l'energia media consumata.
+Questo approccio ha due limitazioni concrete che hanno reso necessario il meccanismo
+di esplorazione:
+
+\begin{enumerate}
+  \item \textbf{Dipendenza dall'hardware}: i profili energetici misurati sull'hardware
+    di sviluppo non corrispondono necessariamente ai consumi reali su un nodo edge con
+    CPU o workload diversi. I valori offline potrebbero sovra- o sotto-stimare
+    sistematicamente il consumo reale, portando lo scheduler a preferire stabilmente
+    una variante nominalmente ``economica'' che in produzione è invece costosa --- e
+    viceversa.
+
+  \item \textbf{Scalabilità della profilazione}: per ogni nuova variante sarebbe
+    necessario ripetere una profilazione offline esaustiva prima di poterla deployare.
+    Questo crea un collo di bottiglia nello sviluppo e impedisce l'aggiunta rapida di
+    nuove varianti al sistema.
+\end{enumerate}
+
+Indipendentemente da queste due limitazioni principali, vale la pena notare che il
+consumo energetico non è stazionario --- dipende dal carico del sistema, dalla
+temperatura e dallo stato della cache del container. Una stima offline non cattura
+questa variabilità.
+
+Il meccanismo UCB (Upper Confidence Bound) affronta queste problematiche con il
+principio di \textbf{ottimismo sotto incertezza} (\textit{Optimism in the Face of
+Uncertainty}): per varianti poco osservate, il sistema assume \textit{ottimisticamente}
+che il loro consumo energetico reale potrebbe essere inferiore alla stima corrente.
+Questo incentiva l'esplorazione di varianti sotto-campionate, raccogliendo dati reali
+da InfluxDB e convergendo progressivamente a stime accurate senza richiedere alcuna
+profilazione offline preventiva.
+
+\subsection{Come vengono acquisiti i dati}
+
+Il flusso di acquisizione è il seguente:
+
+\begin{lstlisting}
+Invocazione
+    |
+    v
+Esecuzione container
+    |
+    v
+Lettura RAPL / perf-stat  (energia CPU durante l'esecuzione)
+    |
+    v
+Write su InfluxDB
+    measurement : energy_sample
+    tag         : variant_id, function_name
+    fields      : invocation_joule, cold_start_joule, timestamp
+    |
+    v
+EMA update su etcd  (alpha = 0.2)
+    E_new = 0.2 * E_measured + 0.8 * E_old
+\end{lstlisting}
+
+Ogni invocazione produce quindi due effetti persistenti:
+
+\begin{itemize}
+  \item \textbf{InfluxDB} accumula la serie storica delle misurazioni per variante; da
+    essa si estraggono $\sigma$ e $n$ utilizzati nel termine di esplorazione UCB.
+  \item \textbf{etcd} mantiene la stima EMA corrente: è il valore $\mu$ primario nella
+    formula LCB, nonché il fallback unico quando InfluxDB non è disponibile o ha
+    campioni insufficienti.
+\end{itemize}
+
+\subsubsection*{Formula LCB (Lower Confidence Bound)}
+
+Per la \textit{minimizzazione} energetica si usa il limite inferiore di confidenza
+(equivalente all'UCB classico applicato alla quantità negata $-E$):
+
+\[
+  \text{LCB}_i = \mu^{\text{EMA}}_i
+               - \beta \cdot \frac{\sigma^{\text{influx}}_i}{\sqrt{n_i}}
+\]
+
+dove:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Simbolo} & \textbf{Significato} \\
+\midrule
+$\mu^{\text{EMA}}_i$       & Stima EMA dell'energia della variante $i$
+                              (da etcd, $\alpha = 0.2$) \\
+$\sigma^{\text{influx}}_i$ & Deviazione standard calcolata sui campioni InfluxDB
+                              (ultimi 24 h) \\
+$n_i$                      & Numero di campioni InfluxDB disponibili \\
+$\beta$                    & Parametro di esplorazione (configurabile, default 1.0) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\medskip
+\noindent\textbf{Perché EMA come $\mu$?}
+L'EMA è un estimatore ricorrente con fattore di smorzamento $\alpha = 0.2$: pondera di
+più le misurazioni recenti e dimentica progressivamente quelle vecchie. Questo lo rende
+più robusto rispetto a una media aritmetica su 24 h quando il consumo energetico del
+nodo varia nel tempo (temperatura, carico CPU, stato cache).
+
+\medskip
+\noindent\textbf{Proprietà:}
+\begin{itemize}
+  \item $n_i$ grande (variante ben esplorata):
+    $\sigma_i / \sqrt{n_i} \to 0 \;\Rightarrow\;
+    \text{LCB}_i \to \mu^{\text{EMA}}_i$ \emph{(sfruttamento)}
+  \item $n_i$ piccolo (variante sotto-esplorata):
+    correzione ampia $\Rightarrow \text{LCB}_i \ll \mu^{\text{EMA}}_i$
+    \emph{(esplorazione ottimistica)}
+  \item $\beta = 0$: UCB disabilitato, si usa solo l'EMA
+  \item $\beta \to \infty$: massima esplorazione
+\end{itemize}
+
+\medskip
+\noindent\textbf{Fallback:} se InfluxDB non è raggiungibile, oppure la variante ha
+meno di $\texttt{min\_samples}$ (default: 5) campioni --- soglia sotto la quale
+$\sigma$ sarebbe inaffidabile --- lo scheduler usa l'EMA da etcd senza correzione.
+
+% ======================================================================
+\section{Scheduling Green-Aware}
+% ======================================================================
+
+\subsection{Visione ad alto livello}
+
+Quando arriva una richiesta di invocazione per una funzione logica
+(es.\ \texttt{SpamDetection}), lo scheduler esegue i seguenti passi:
+
+\begin{lstlisting}
+1. Recupera la lista di varianti fisiche dal JSON (etcd)
+2. Per ogni variante: ottieni energia stimata
+       --> recupera mu_EMA da etcd
+       --> se UCB attivo e n_i >= min_samples: LCB = mu_EMA - beta*sigma_influx/sqrt(n)
+       --> altrimenti: usa mu_EMA direttamente (nessuna correzione)
+3. Calcola la frontiera di Pareto bi-obiettivo (energia (min), errore (min))
+4. Calcola lambda dalla carbon intensity corrente della zona del nodo
+5. Scalarizza la frontiera con lambda -> seleziona la variante con score minimo
+6. Invoca la variante selezionata; registra l'energia misurata
+\end{lstlisting}
+
+L'obiettivo è scegliere la variante che realizza il miglior compromesso tra qualità del
+risultato e costo energetico, nel contesto energetico corrente del nodo edge.
+
+\subsection{Il parametro \texorpdfstring{$\lambda$}{lambda}}
+
+\subsubsection*{Frontiera di Pareto}
+
+Dati $n$ varianti, il sistema calcola la frontiera di Pareto bi-obiettivo
+(energia, errore), entrambi da minimizzare:
+
+\begin{enumerate}
+  \item Ordina le varianti per energia crescente; a parità, per errore crescente.
+  \item Scansione singola: una variante entra nella frontiera se e solo se il suo
+    errore è strettamente minore del minimo errore dei punti precedenti.
+\end{enumerate}
+
+L'algoritmo è $O(n \log n)$ totale e identifica tutti e soli i punti non dominati:
+nessuna variante nella frontiera è ``peggiore su entrambi gli assi'' rispetto a
+un'altra.
+
+\medskip
+\noindent\textbf{Esempio (PiLeibniz, varianti selezionate):}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Variante} & \textbf{Energia (J)} & \textbf{Errore} & \textbf{Pareto?} \\
+\midrule
+\texttt{n1000}          & 0.000196 & $2.0\times10^{-3}$ & $\checkmark$ \\
+\texttt{n5000}          & 0.000308 & $4.0\times10^{-4}$ & $\checkmark$ \\
+\texttt{n10000}         & 0.000421 & $2.0\times10^{-4}$ & $\checkmark$ \\
+\texttt{n50000}         & 0.000817 & $4.0\times10^{-5}$ & $\checkmark$ \\
+\texttt{n100000}        & 0.001163 & $2.0\times10^{-5}$ & $\checkmark$ \\
+\texttt{n200000}        & 0.001534 & $1.0\times10^{-5}$ & $\checkmark$ \\
+\texttt{c}              & 0.001052 & $0.0$              & $\checkmark$ \\
+\texttt{optimization-py} & 0.007318 & $0.0$             & $\times$ dominata da \texttt{c} \\
+\texttt{base}           & 0.007823 & $0.0$              & $\times$ dominata da \texttt{c} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Scalarizzazione con \texorpdfstring{$\lambda$}{lambda}}
+
+Data la frontiera di Pareto, ogni variante $i$ riceve un punteggio:
+
+\[
+  \text{score}(i) = (1 - \lambda) \cdot \hat{E}_i + \lambda \cdot \hat{\varepsilon}_i
+\]
+
+dove $\hat{E}_i$ e $\hat{\varepsilon}_i$ sono i valori di energia ed errore normalizzati
+nell'intervallo $[0,1]$ rispetto al range della frontiera. La variante con il
+\textbf{punteggio minimo} viene selezionata.
+
+\medskip
+\noindent\textbf{Cosa rappresenta $\lambda$:}
+
+$\lambda \in [0, 1]$ è un \textit{peso di qualità} che esprime quanto privilegiare
+l'accuratezza del risultato rispetto all'efficienza energetica nell'istante corrente.
+
+\begin{itemize}
+  \item $\lambda \to 0$ (rete sporca, alta CI): il termine dominante è
+    $(1-\lambda)\hat{E}_i$ $\to$ il sistema seleziona la variante più efficiente
+    energeticamente.
+  \item $\lambda \to 1$ (rete pulita, bassa CI): il termine dominante è
+    $\lambda\hat{\varepsilon}_i$ $\to$ il sistema seleziona la variante più accurata
+    (errore minimo).
+  \item $\lambda = 0.5$: selezione al ``ginocchio'' della frontiera, bilanciando i due
+    obiettivi.
+\end{itemize}
+
+$\lambda$ non è un parametro configurato manualmente: viene calcolato automaticamente
+in tempo reale dalla carbon intensity della zona geografica del nodo edge.
+
+\subsection{Calcolo di \texorpdfstring{$\lambda$}{lambda} dalla Carbon Intensity}
+
+La \textbf{carbon intensity} (CI, misurata in gCO$_2$eq/kWh) quantifica quante
+emissioni di CO$_2$ equivalente vengono prodotte per ogni kWh di energia consumata
+dalla rete elettrica locale. Viene ottenuta in tempo reale dall'API ElectricityMaps
+(con cache di 15 minuti).
+
+$\lambda$ è derivato tramite una \textbf{funzione sigmoide logistica} centrata sui
+valori storici della zona:
+
+\[
+  \lambda = \frac{1}{1 + \exp\!\left(k \cdot \dfrac{CI - \mu_z}{\sigma_z}\right)}
+\]
+
+dove:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Simbolo} & \textbf{Significato} \\
+\midrule
+$CI$      & Carbon intensity corrente (gCO$_2$eq/kWh) \\
+$\mu_z$   & Media storica della CI per la zona $z$ \\
+$\sigma_z$ & Parametro di scala:
+             $\sigma_z = (P_{95} - P_5) \big/ \!\left(2\ln\tfrac{1-\alpha}{\alpha}\right)$,
+             con $\alpha=0.1$ \\
+$k$       & Pendenza della sigmoide (default 0.45) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La formula per $\sigma_z$ assicura che $\lambda(P_{95}) = \alpha = 0.1$ e
+$\lambda(P_5) = 1 - \alpha = 0.9$: ai valori estremi della distribuzione storica,
+$\lambda$ raggiunge i valori estremi dell'intervallo, massimizzando la sensibilità del
+sistema nelle condizioni reali attese per quella zona.
+
+\subsection{Dipendenza dalla zona geografica}
+
+La sigmoide è \textbf{parametrizzata per zona} perché la distribuzione storica della CI
+varia enormemente tra Paesi con mix energetici diversi.
+
+Se si usasse una sigmoide globale con $\mu$ unica, sarebbe completamente insensibile
+alle variazioni locali: in Francia (CI media $\approx$ 14 gCO$_2$/kWh), anche i picchi
+locali non superano mai la media globale e $\lambda$ sarebbe sempre vicino a 1
+indipendentemente dal contesto. In Polonia (CI media $\approx$ 499 gCO$_2$/kWh),
+$\lambda$ sarebbe sempre vicino a 0.
+
+Usando $\mu$ e $\sigma$ calibrati sulla distribuzione storica \textit{di quella zona},
+la sigmoide risponde alle oscillazioni locali: quando la CI di una zona è sopra la sua
+media storica, $\lambda$ scende (si risparmia energia); quando è sotto la media,
+$\lambda$ sale (si usa la variante più precisa). Il sistema si adatta all'energia
+disponibile nel preciso contesto geografico del nodo, non a una scala globale
+arbitraria.
+
+I parametri sono pre-calcolati offline da dati storici scaricati da ElectricityMaps e
+salvati in \texttt{zone\_ci\_params.csv}. Le cinque zone scelte coprono l'intero spettro
+della carbon intensity europea --- da una rete quasi completamente idroelettrica
+(Norvegia) o nucleare (Francia) a una rete a carbone dominante (Polonia) ---
+garantendo che il sistema venga validato su regimi di $\lambda$ bassi, medi e alti:
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lclp{6.5cm}}
+\toprule
+\textbf{Zona} & $\boldsymbol{\mu}$ \textbf{(gCO$_2$/kWh)} &
+$\boldsymbol{\sigma}$ & \textbf{Caratteristica rete} \\
+\midrule
+NO & 6   & $\sim$1  & Idroelettrico dominante $\rightarrow$ quasi sempre $\lambda \approx 1$ \\
+FR & 14  & $\sim$4  & Nucleare dominante $\rightarrow$ $\lambda$ solitamente alto \\
+ES & 95  & $\sim$14 & Mix rinnovabile/gas $\rightarrow$ $\lambda$ variabile \\
+DE & 278 & $\sim$41 & Mix carbone/rinnovabili $\rightarrow$ $\lambda$ mediamente basso \\
+PL & 499 & $\sim$35 & Carbone dominante $\rightarrow$ quasi sempre $\lambda \approx 0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ======================================================================
+\section{Bozza degli Esperimenti}
+% ======================================================================
+
+Oltre agli esperimenti descritti di seguito, la sperimentazione include alcune analisi
+preliminari che ne costituiscono il presupposto: (i) la profilazione offline del consumo
+energetico di ogni variante tramite invocazioni ripetute con lettura da InfluxDB;
+(ii) la calibrazione della sigmoide per zona geografica a partire dai dati storici di
+carbon intensity scaricati da ElectricityMaps.
+
+\subsection{Exp~1 --- Frontiera di Pareto e selezione per
+  \texorpdfstring{$\lambda$}{lambda}}
+
+\textbf{Obiettivo:} per ogni famiglia di funzioni, visualizzare la frontiera di Pareto
+(energia vs.\ errore/qualità) e mostrare quale variante viene selezionata al variare di
+$\lambda$, evidenziando come la scalarizzazione si sposta lungo la frontiera in funzione
+del peso attribuito all'efficienza energetica rispetto all'accuratezza.
+
+\medskip
+\textbf{Metodologia:}
+\begin{itemize}
+  \item Per ogni funzione, calcolare la frontiera di Pareto bi-obiettivo
+    (energia, errore).
+  \item Spazzare $\lambda \in [0, 1]$ a passi di 0.1 e registrare quale variante viene
+    selezionata dallo scheduler in assenza di rumore (stime energetiche = valori
+    offline).
+  \item Visualizzare: scatter plot energia vs.\ errore con fronte evidenziato, e un
+    grafico ``variante selezionata vs.\ $\lambda$'' che mostra la transizione lungo il
+    fronte.
+\end{itemize}
+
+\textbf{Risultato atteso:} la variante selezionata si sposta monotonicamente dalla più
+efficiente ($\lambda = 0$) alla più accurata ($\lambda = 1$); le transizioni si
+collocano ai valori di $\lambda$ in cui lo score delle varianti si incrociano.
+
+\subsection{Exp~2 --- Comportamento dello scheduling al variare della CI}
+
+\textbf{Obiettivo:} verificare che il sistema selezioni varianti diverse in funzione
+della carbon intensity della zona, con una transizione continua dalla variante più
+accurata (CI bassa) a quella più efficiente (CI alta) che rispecchi il comportamento
+atteso della sigmoide calibrata per zona.
+
+\medskip
+\textbf{Metodologia:}
+\begin{itemize}
+  \item Per ogni zona (NO, FR, ES, DE, PL) e per funzioni rappresentative di entrambe
+    le famiglie (es.\ \texttt{PiLeibniz}, \texttt{SpamDetection}):
+    \begin{itemize}
+      \item Invocare lo scheduler con la CI storica mediana di quella zona.
+      \item Registrare la variante selezionata e il valore di $\lambda$.
+    \end{itemize}
+  \item Mettere in risalto il rapporto fra accuratezza del risultato e consumo
+    energetico in funzione dei valori di CI.
+\end{itemize}
+
+\textbf{Risultato atteso:}
+\begin{itemize}
+  \item NO (CI $\approx$ 6) $\;\rightarrow\;$ $\lambda \approx 1$
+    $\;\rightarrow\;$ variante più accurata
+  \item FR (CI $\approx$ 14) $\;\rightarrow\;$ $\lambda$ alto
+    $\;\rightarrow\;$ variante heavy/medium
+  \item ES (CI $\approx$ 95) $\;\rightarrow\;$ $\lambda$ medio
+    $\;\rightarrow\;$ variante di compromesso
+  \item DE (CI $\approx$ 278) $\;\rightarrow\;$ $\lambda$ basso
+    $\;\rightarrow\;$ variante leggera
+  \item PL (CI $\approx$ 499) $\;\rightarrow\;$ $\lambda \approx 0$
+    $\;\rightarrow\;$ variante più efficiente
+\end{itemize}
+
+\subsection{Exp~3 --- Risparmio energetico vs.\ baseline always-accurate}
+
+\textbf{Obiettivo:} quantificare il risparmio energetico dello scheduler green-aware
+(in termini di CI) rispetto a uno scheduler che seleziona sempre la variante più
+accurata, su un workload distribuito su più zone con carbon intensity diverse.
+
+\medskip
+\textbf{Metodologia:}
+\begin{itemize}
+  \item Workload: invocazioni distribuite su tutte e 6 le funzioni, con distribuzione
+    uniforme delle zone (NO, FR, ES, DE, PL).
+  \item Strategie a confronto:
+    \begin{enumerate}
+      \item Baseline always-accurate: seleziona sempre la variante con
+        \texttt{is\_approximate: false} più precisa, indipendentemente dalla CI.
+      \item Scheduler green-aware (questo lavoro).
+    \end{enumerate}
+  \item Metriche: energia totale (J), risparmio percentuale $\Delta E\%$,
+    errore/accuracy medio.
+\end{itemize}
+
+\textbf{Risultato atteso:} lo scheduler produce un risparmio energetico significativo
+rispetto alla baseline, in particolare nelle zone con CI elevata (DE, PL), mantenendo
+qualità alta nelle zone pulite (NO, FR).
+
+\subsection{Exp~4 --- Convergenza EMA con stime iniziali errate}
+
+\textbf{Obiettivo:} verificare che il meccanismo EMA+LCB corregga autonomamente stime
+energetiche iniziali errate attraverso le misurazioni reali, mettendo in risalto la
+prima fase di esplorazione.
+
+\medskip
+\textbf{Metodologia:}
+\begin{itemize}
+  \item Funzione: \texttt{PiLeibniz}.
+  \item Setup: alterare artificialmente \texttt{invocation\_joule} di una variante
+    approssimata nel JSON portandolo a un valore significativamente gonfiato rispetto
+    al reale.
+  \item Forzare un numero iniziale di campioni InfluxDB per attivare il termine LCB,
+    quindi eseguire 100 invocazioni di scheduling con $\lambda$ basso (zona DE ---
+    preferisce efficienza), registrando ad ogni step: variante selezionata,
+    $\mu_{\text{EMA}}$, LCB della variante perturbata.
+\end{itemize}
+
+\medskip
+\noindent\textbf{Come mostrare la convergenza:}\\
+Tracciare su un unico grafico (asse X = invocazioni della variante perturbata):
+\begin{itemize}
+  \item $\mu_{\text{EMA}}$ che decae esponenzialmente dal valore gonfiato verso il
+    valore reale
+  \item Soglia corrispondente alla variante concorrente --- quando $\mu_{\text{EMA}}$
+    scende sotto questa soglia, la variante perturbata diventa di nuovo competitiva
+  \item Punti colorati sulla timeline: quale variante viene selezionata dallo scheduler
+\end{itemize}
+
+La convergenza è descrivibile analiticamente: con $\alpha = 0.2$, valore reale $E^*$,
+valore iniziale $E_0$:
+\[
+  \mu^{\text{EMA}}(t) = E^* + (E_0 - E^*) \cdot (1-\alpha)^t
+\]
+
+\textbf{Risultato atteso:} il meccanismo LCB rende la variante perturbata attrattiva
+in fase esplorativa; man mano che si accumulano misurazioni reali, l'EMA converge al
+valore reale e la selezione diventa stabile e corretta.
+
+\subsection{Exp~5 --- Sensibilità al parametro
+  \texorpdfstring{$\beta$}{beta}}
+
+\textbf{Obiettivo:} $\beta = 0$ corrisponde al puro sfruttamento (nessuna esplorazione);
+valori maggiori aumentano la robustezza a stime iniziali errate a scapito di qualche
+invocazione esplorativa in più. Questo esperimento confronta questi regimi.
+
+\medskip
+\textbf{Metodologia:}
+\begin{itemize}
+  \item Funzione: \texttt{PiLeibniz} (fronte di Pareto ricco, 9 varianti).
+  \item Setup: stime energetiche iniziali volutamente imprecise (pochi campioni
+    offline).
+  \item $\beta \in \{0,\; 0.5,\; 1.0,\; 2.0\}$.
+  \item Per ciascun $\beta$: 200 invocazioni, registrando variante selezionata ad ogni
+    step, numero di invocazioni su varianti sub-ottimali, e invocazione di convergenza.
+\end{itemize}
+
+\textbf{Risultato atteso:}
+\begin{itemize}
+  \item $\beta = 0$: puro sfruttamento --- se la stima iniziale è errata, non converge
+    mai.
+  \item $\beta = 0.5$--$1.0$: convergenza in 15--30 invocazioni con overhead
+    esplorativo limitato.
+  \item $\beta = 2.0$: esplora molto di più, convergenza più lenta ma più robusta a
+    outlier.
+\end{itemize}
+
+\subsection{Metriche di valutazione}
+
+\begin{table}[h!]
+\centering
+\small
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Metrica} & \textbf{Descrizione} \\
+\midrule
+$E_{\text{tot}}$          & Energia totale consumata (J) in $N$ invocazioni \\
+$\varepsilon_{\text{med}}$ & Errore relativo mediano dell'output (funzioni numeriche) \\
+$A_{\text{med}}$           & Accuracy media delle classificazioni (funzioni ML) \\
+$\Delta E\%$               & Risparmio energetico vs.\ baseline always-accurate:
+                             $(E_\text{base} - E_\text{sched})/E_\text{base}$ \\
+$n_{\text{exp}}$           & Numero di invocazioni esplorative
+                             (UCB attivo, $n_i < \texttt{min\_samples}$) \\
+$t_{\text{conv}}$          & Invocazioni fino alla convergenza UCB
+                             (variante ottimale stabile) \\
+$\lambda_{\text{med}}$     & Valore mediano di $\lambda$ per zona
+                             (verifica calibrazione sigmoide) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}
