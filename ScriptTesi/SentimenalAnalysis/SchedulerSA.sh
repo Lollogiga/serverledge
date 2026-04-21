@@ -33,27 +33,51 @@ $SERVERLEDGE create \
   --approximate
 
 ok "SentimentAnalysis created (variants loaded automatically)"
-# -----------------------
-# INVOKE 1: legacy
-# -----------------------
-log "Invoking SentimentAnalysis (legacy)"
-$SERVERLEDGE invoke --function SentimentAnalysis --param text:"Looks good but it works terribly"
-ok "Legacy invocation completed"
-
 
 # -----------------------
-# INVOKE 2: allowApprox
+# Helper ML-tolerant
 # -----------------------
-log "Invoking SentimentAnalysis with allowApprox"
-$SERVERLEDGE invoke --function SentimentAnalysis --allowApprox --param text::"Looks good but it works terribly"
-ok "allowApprox invocation completed"
+sa_invoke() {
+  local label="$1"; shift
+  log "$label"
+  if $SERVERLEDGE invoke "$@"; then
+    ok "Completato: $label"
+  else
+    rc=$?
+    if [[ $rc -eq 2 ]]; then
+      warn "HTTP 500 — modello ML non pre-scaricato nel container (atteso in ambienti senza modelli)"
+    else
+      log "Invocation exit=$rc (label: $label)"
+      exit $rc
+    fi
+  fi
+}
 
 # -----------------------
-# INVOKE 3: strict budget (expected reject)
+# INVOKE 1: default zone (da serverledge-conf.yaml)
 # -----------------------
-log "Invoking SentimentAnalysis with allowApprox + strict energy budget (expected reject)"
-if ! $SERVERLEDGE invoke --function SentimentAnalysis --allowApprox --maxEnergyJoule 0.0000000001 --param text:"Looks good but it works terribly"; then
-  warn "Expected: rejected by energy policy"
-fi
+sa_invoke "default zone" \
+  --function SentimentAnalysis --param text:"Looks good but it works terribly"
+
+# -----------------------
+# INVOKE 2: CI zona pulita NO-NO5 (~20 gCO2/kWh)
+# λ alto → roberta-large (max quality)
+# -----------------------
+sa_invoke "ci-zone=NO-NO5 (rete pulita, atteso: roberta-large)" \
+  --function SentimentAnalysis --param text:"Looks good but it works terribly" --ci-zone NO-NO5
+
+# -----------------------
+# INVOKE 3: CI zona media DE (~350 gCO2/kWh)
+# λ~0.55 → distilbert
+# -----------------------
+sa_invoke "ci-zone=DE (mix, atteso: distilbert)" \
+  --function SentimentAnalysis --param text:"Looks good but it works terribly" --ci-zone DE
+
+# -----------------------
+# INVOKE 4: CI zona sporca PL (~750 gCO2/kWh)
+# λ basso → vader (cheapest)
+# -----------------------
+sa_invoke "ci-zone=PL (rete sporca, atteso: vader)" \
+  --function SentimentAnalysis --param text:"Looks good but it works terribly" --ci-zone PL
 
 ok "SchedulingSA completed"

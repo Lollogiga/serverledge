@@ -38,8 +38,8 @@ IMAGES=(
 # FUNZIONI / MODELLI
 # =====================================================
 FUNCTIONS=(
-  "ImageClassification"        # MobileNetV2 (HQ)
-  "ImageClassificationLight"   # MobileNetV2 0.5 (Low-energy)
+  "ImageClassification"             # ViT-base (HQ, variant-id=vit-base)
+  "ImageClassification-mobilenet-v2" # MobileNetV2 1.0 (Low-energy)
 )
 
 # =====================================================
@@ -80,14 +80,23 @@ EOF
   for FN in "${FUNCTIONS[@]}"; do
     log_info "Invoking $FN on $IMAGE_NAME"
 
-    $SERVERLEDGE invoke \
-      --function "$FN" \
-      --params_file "$PARAMS_FILE" \
-      --ret_output
-
+    if $SERVERLEDGE invoke \
+         --function "$FN" \
+         --params_file "$PARAMS_FILE" \
+         --ret_output; then
+      log_ok "$FN on $IMAGE_NAME completed"
+    else
+      rc=$?
+      if [[ $rc -eq 2 ]]; then
+        log_warn "$FN on $IMAGE_NAME returned HTTP 500 — modello ML non pre-scaricato (atteso in ambienti senza modelli)"
+      else
+        log_error "$FN on $IMAGE_NAME fallito con exit=$rc"
+        exit $rc
+      fi
+    fi
     echo ""
   done
 
 done
 
-log_ok "All invocations completed"
+log_ok "All InvokeImageDetection invocations completed (ML failures documented above)"

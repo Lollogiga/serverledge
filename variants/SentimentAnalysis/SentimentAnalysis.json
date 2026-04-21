@@ -22,8 +22,9 @@
       "entry_point": "SADistilBERT.handler",
       "src": "SADistilBERT.py",
       "energy": {
-        "cold_start_joule": 3.200000000,
-        "invocation_joule": 0.040000000
+        "cold_start_joule": 3.248000000,
+        "invocation_joule": 0.038700000,
+        "measured": false
       },
       "output": {
         "type": "quality",
@@ -38,13 +39,14 @@
       "entry_point": "SABertTiny.handler",
       "src": "SABertTiny.py",
       "energy": {
-        "cold_start_joule": 1.500000000,
-        "invocation_joule": 0.012000000
+        "cold_start_joule": 1.412000000,
+        "invocation_joule": 0.011300000,
+        "measured": false
       },
       "output": {
         "type": "quality",
         "quality": "medium-low",
-        "quality_score": 0.840
+        "quality_score": 0.835
       },
       "is_approximate": true
     },
@@ -54,13 +56,14 @@
       "entry_point": "SAvader.handler",
       "src": "SAvader.py",
       "energy": {
-        "cold_start_joule": 0.060000000,
-        "invocation_joule": 0.003000000
+        "cold_start_joule": 0.057000000,
+        "invocation_joule": 0.002400000,
+        "measured": false
       },
       "output": {
         "type": "quality",
         "quality": "low",
-        "quality_score": 0.700
+        "quality_score": 0.674
       },
       "is_approximate": true
     }

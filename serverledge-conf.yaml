@@ -17,6 +17,9 @@ electricitymaps:
 # UCB (Upper Confidence Bound) exploration in Pareto variant selection
 # ---------------------------------------------------------------------------
 scheduling:
+  energy:
+    include_coldstart: false  # Non includere cold start nell'energia stimata:
+                              # i container vengono pre-riscaldati dal warm-up.
   ucb:
     beta: 1.0          # Forza esplorazione β: valori alti → più esplorazione.
                        # Impostare a 0 per disabilitare UCB (solo exploitation).
@@ -32,3 +35,10 @@ influx:
   token:  "serverledge-token"
   org:    "serverledge"
   bucket: "serverledge-energy"
+
+# ---------------------------------------------------------------------------
+# Container pool — memoria totale disponibile per i container (MB)
+# ---------------------------------------------------------------------------
+container:
+  pool:
+    memory: 8192

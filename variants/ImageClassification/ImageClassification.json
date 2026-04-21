@@ -22,8 +22,9 @@
       "entry_point": "ImageClassificationEfficientNetB0.handler",
       "src": "ImageClassificationEfficientNetB0.py",
       "energy": {
-        "cold_start_joule": 1.2,
-        "invocation_joule": 0.45
+        "cold_start_joule": 1.183000000,
+        "invocation_joule": 0.418000000,
+        "measured": false
       },
       "output": {
         "type": "quality",
@@ -54,8 +55,9 @@
       "entry_point": "ImageClassificationMobileNetTiny.handler",
       "src": "ImageClassificationMobileNetTiny.py",
       "energy": {
-        "cold_start_joule": 0.8,
-        "invocation_joule": 0.08
+        "cold_start_joule": 0.779000000,
+        "invocation_joule": 0.077000000,
+        "measured": false
       },
       "output": {
         "type": "quality",

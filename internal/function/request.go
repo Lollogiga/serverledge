@@ -20,6 +20,21 @@ type Request struct {
 	// CIZoneOverride, se non vuoto, sostituisce la zona letta da config
 	// solo per questa invocazione (utile per test multi-zona).
 	CIZoneOverride string
+
+	// CIOverride, se > 0, usa direttamente questo valore di carbon intensity
+	// (gCO2eq/kWh) saltando la query a ElectricityMaps. Utile per esperimenti
+	// in cui i valori di CI sono letti da un CSV storico.
+	CIOverride float64
+
+	// LambdaOverride, se non nil, usa direttamente questo valore di λ ∈ [0,1]
+	// saltando sia la query a ElectricityMaps sia la conversione CI→λ.
+	// 0 = massima efficienza energetica, 1 = massima accuratezza, 0.5 = bilanciato.
+	// Usato per confrontare lo scheduler adattivo con politiche fisse negli esperimenti.
+	LambdaOverride *float64
+
+	// BetaOverride, se non nil, sovrascrive il parametro β dell'UCB exploration
+	// per questa singola invocazione. β=0 disabilita l'esplorazione UCB.
+	BetaOverride *float64
 }
 
 type RequestQoS struct {

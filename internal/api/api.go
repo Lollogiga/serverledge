@@ -83,7 +83,11 @@ func InvokeFunction(c echo.Context) error {
 	r.Async = invocationRequest.Async
 	r.ReturnOutput = invocationRequest.ReturnOutput
 	r.CIZoneOverride = invocationRequest.CIZoneOverride
+	r.CIOverride = invocationRequest.CIOverride
+	r.LambdaOverride = invocationRequest.LambdaOverride
+	r.BetaOverride = invocationRequest.BetaOverride
 	// Note: Pareto λ is now derived automatically from Carbon Intensity — no user input needed.
+	// CIOverride and LambdaOverride allow experiment scripts to bypass the ElectricityMaps API.
 
 	reqId := fmt.Sprintf(
 		"%s-%s-%d",

@@ -90,18 +90,34 @@ type evaluatedVariant struct {
 }
 
 // energyCostJouleUCB returns the Lower Confidence Bound (LCB) energy estimate
-// for UCB exploration. The LCB formula is:
+// for UCB exploration. The formula combines EMA and InfluxDB statistics:
 //
-//	LCB = µ - β · σ / √n
+//	LCB = µ - β · σ / √n_eff
 //
-// where µ, σ, n are derived from historical InfluxDB measurements.
-// Being optimistic about energy (assuming it could be lower) drives the
-// scheduler to explore under-sampled variants.
+// where:
+//   - µ       = stats.Mean (real InfluxDB average) when n > 0,
+//               otherwise the EMA prior stored in etcd.
+//   - σ       = stats.Stddev when n ≥ minSamples (statistically reliable);
+//               otherwise priorSigmaFraction · µ_EMA (conservative prior).
+//   - n_eff   = n + priorVirtualCount (always > 0).
+//               n=0 → n_eff=0.5 → largest bonus (most exploration).
+//               n→∞ → bonus → 0 (well-known variant, no correction needed).
 //
-// Falls back to the etcd energy profile when:
-//   - InfluxDB is not configured or unavailable
-//   - the variant has fewer than minSamples observations
-//   - beta == 0 (UCB disabled)
+// Exploration is ALWAYS active: a variant with 0 samples receives the
+// largest possible LCB correction, never falls back to EMA only.
+//
+// Falls back to the EMA alone (no LCB correction) only when:
+//   - InfluxDB is not configured or unavailable.
+//   - beta == 0 (exploration disabled).
+
+// priorSigmaFraction is the fraction of µ_EMA used as σ when real statistics
+// are not yet reliable (n < minSamples). 0.30 encodes ±30 % prior uncertainty.
+const priorSigmaFraction = 0.30
+
+// priorVirtualCount prevents division-by-zero and ensures n=0 always has a
+// strictly larger correction than n=1.
+const priorVirtualCount = 0.5
+
 func energyCostJouleUCB(
 	fn *function.Function,
 	warm bool,
@@ -109,6 +125,7 @@ func energyCostJouleUCB(
 	minSamples int,
 ) (joule float64, usedUCB bool, sampleCount int64, err error) {
 
+	// base == µ_EMA: the offline/EMA prior persisted in etcd.
 	base, baseErr := energyCostJoule(fn, warm)
 	if baseErr != nil {
 		return 0, false, 0, baseErr
@@ -123,26 +140,38 @@ func energyCostJouleUCB(
 	// fn.Name matches the function_name tag in InfluxDB (e.g. "montecarlo-n1000")
 	stats, queryErr := influx.QueryEnergyStats(ctx, fn.Name, "24h")
 	if queryErr != nil {
-		// InfluxDB unavailable — silent fallback to etcd value
+		// InfluxDB unavailable — use EMA alone, no exploration correction.
 		if queryErr != influx.ErrInfluxNotConfigured {
-			log.Printf("[ucb] influx query error for %s: %v (using etcd fallback)", fn.Name, queryErr)
+			log.Printf("[ucb] influx query error for %s: %v (using EMA only)", fn.Name, queryErr)
 		}
 		return base, false, 0, nil
 	}
-	if stats.Count < int64(minSamples) {
-		log.Printf("[ucb] variant=%s has %d/%d samples — using etcd value (exploration deferred)",
-			fn.VariantID, stats.Count, minSamples)
-		return base, false, stats.Count, nil
+
+	// (1) Best available mean: real InfluxDB data when present, EMA prior otherwise.
+	mu := base
+	if stats.Count > 0 {
+		mu = stats.Mean
 	}
 
-	// LCB: optimistic lower bound for energy minimisation
-	lcb := stats.Mean - beta*stats.Stddev/math.Sqrt(float64(stats.Count))
+	// (2) Uncertainty estimate: real σ when statistically reliable,
+	//     a prior fraction of µ_EMA when data are scarce (including n=0).
+	sigma := priorSigmaFraction * base
+	if stats.Count >= int64(minSamples) {
+		sigma = stats.Stddev
+	}
+
+	// (3) Effective sample count: always > 0, monotonically encodes confidence.
+	//     n=0 → nEff=0.5 (biggest bonus); n=5 → nEff=5.5 (smaller bonus).
+	nEff := float64(stats.Count) + priorVirtualCount
+
+	// (4) LCB = µ - β · σ / √n_eff  (clamped to 0 — energy cannot be negative).
+	lcb := mu - beta*sigma/math.Sqrt(nEff)
 	if lcb < 0 {
 		lcb = 0
 	}
 
-	log.Printf("[ucb] variant=%s  µ=%.6f  σ=%.6f  n=%d  β=%.2f  LCB=%.6f  etcd=%.6f",
-		fn.VariantID, stats.Mean, stats.Stddev, stats.Count, beta, lcb, base)
+	log.Printf("[ucb] variant=%s  n=%d  µ=%.6f  σ=%.6f  nEff=%.1f  β=%.2f  LCB=%.6f",
+		fn.VariantID, stats.Count, mu, sigma, nEff, beta, lcb)
 
 	return lcb, true, stats.Count, nil
 }
@@ -216,9 +245,44 @@ func SelectParetoVariant(
 
 	base := r.Fun
 
-	// λ is derived automatically from the current carbon intensity.
-	// r.CIZoneOverride (se non vuoto) sovrascrive la zona da config per questa invocazione.
-	lambda, ci := GetLambdaAndCI(r.CIZoneOverride)
+	// ---------------------------------------------------------------------------
+	// λ resolution — priority order:
+	//   1. r.LambdaOverride != nil  → use directly (experiment fixed-lambda modes)
+	//   2. r.CIOverride > 0         → skip API call, convert CI value to λ via sigmoid
+	//   3. r.CIZoneOverride != ""   → override zone, then fetch CI from ElectricityMaps
+	//   4. default                  → use zone from config, fetch CI from ElectricityMaps
+	// ---------------------------------------------------------------------------
+	var lambda, ci float64
+
+	switch {
+	case r.LambdaOverride != nil:
+		// Fixed-lambda baseline mode: bypass carbon intensity entirely.
+		lambda = *r.LambdaOverride
+		ci = 0 // CI is not meaningful/available in this mode
+		log.Printf("[pareto] lambda_override=%.4f — skipping CI lookup", lambda)
+
+	case r.CIOverride > 0:
+		// CSV-based experiment mode: CI value supplied directly by the client;
+		// convert to λ using the zone's pre-loaded sigmoid parameters.
+		ci = r.CIOverride
+		effZone := r.CIZoneOverride
+		if effZone == "" {
+			effZone = config.GetString(config.ELECTRICITY_MAPS_ZONE, "")
+		}
+		if effZone != "" {
+			if params, ok := getZoneParams(effZone); ok {
+				lambda = CarbonIntensityToLambdaWithStats(ci, params.CIMid, params.S, params.K)
+				log.Printf("[pareto] ci_override=%.1f zone=%s → λ=%.4f (zone sigmoid)", ci, effZone, lambda)
+				break
+			}
+		}
+		lambda = CarbonIntensityToLambda(ci)
+		log.Printf("[pareto] ci_override=%.1f zone=%q → λ=%.4f (global sigmoid fallback)", ci, effZone, lambda)
+
+	default:
+		// Normal mode: fetch real-time CI from ElectricityMaps (cached 15 min).
+		lambda, ci = GetLambdaAndCI(r.CIZoneOverride)
+	}
 
 	report := &function.VariantSchedulingReport{
 		LogicalName:         base.LogicalName,
@@ -252,6 +316,9 @@ func SelectParetoVariant(
 	// This promotes exploration of under-sampled variants (optimism under
 	// uncertainty), embodying the UCB acquisition function principle.
 	ucbBeta := config.GetFloat(config.SchedulingUCBBeta, 1.0)
+	if r.BetaOverride != nil {
+		ucbBeta = *r.BetaOverride
+	}
 	ucbMinSamples := config.GetInt(config.SchedulingUCBMinSamples, 5)
 
 	var evaluated []evaluatedVariant

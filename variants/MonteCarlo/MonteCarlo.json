@@ -7,8 +7,8 @@
       "src": "montecarlo_n1000.py",
       "energy": {
         "cold_start_joule": 0.07,
-        "invocation_joule": 0.00112217,
-        "measured": true
+        "invocation_joule": 0.000147000,
+        "measured": false
       },
       "output": {
         "type": "error",
@@ -23,8 +23,8 @@
       "src": "montecarlo_n5000.py",
       "energy": {
         "cold_start_joule": 0.07,
-        "invocation_joule": 0.001123289,
-        "measured": true
+        "invocation_joule": 0.000912000,
+        "measured": false
       },
       "output": {
         "type": "error",
@@ -71,8 +71,8 @@
       "src": "montecarlo_n100000.py",
       "energy": {
         "cold_start_joule": 0.07,
-        "invocation_joule": 0.137954755,
-        "measured": true
+        "invocation_joule": 0.033710000,
+        "measured": false
       },
       "output": {
         "type": "error",
@@ -87,8 +87,8 @@
       "src": "montecarlo_n500000.py",
       "energy": {
         "cold_start_joule": 0.07,
-        "invocation_joule": 0.005198887,
-        "measured": true
+        "invocation_joule": 0.231480000,
+        "measured": false
       },
       "output": {
         "type": "error",

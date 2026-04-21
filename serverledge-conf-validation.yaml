@@ -1,0 +1,26 @@
+# Config per seconda istanza serverledge (validazione)
+# Porte diverse per non confliggere con l'istanza principale (1323/9876)
+api:
+  port: 1324
+
+registry:
+  udp:
+    port: 9877
+
+electricitymaps:
+  zone: "DE"
+  token: "03VH0VHUU9MGMJFCYoc6"
+  params_file: "zone_ci_params.csv"
+
+scheduling:
+  energy:
+    include_coldstart: false
+  ucb:
+    beta: 1.0
+    min_samples: 5
+
+influx:
+  url:    "http://localhost:8086"
+  token:  "serverledge-token"
+  org:    "serverledge"
+  bucket: "serverledge-energy"

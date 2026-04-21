@@ -1,0 +1,109 @@
+{
+  "variants": [
+    {
+      "id": "base",
+      "runtime": "python310",
+      "entry_point": "lnHarmonic.handler",
+      "src": "lnHarmonic.py",
+      "energy": {
+        "cold_start_joule": 0.070134,
+        "invocation_joule": 0.007700
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0
+      },
+      "is_approximate": false
+    },
+    {
+      "id": "n200000",
+      "runtime": "python310",
+      "entry_point": "lnHarmonic_n200000.handler",
+      "src": "lnHarmonic_n200000.py",
+      "energy": {
+        "cold_start_joule": 0.069800,
+        "invocation_joule": 0.001534
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0000036
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n100000",
+      "runtime": "python310",
+      "entry_point": "lnHarmonic_n100000.handler",
+      "src": "lnHarmonic_n100000.py",
+      "energy": {
+        "cold_start_joule": 0.070200,
+        "invocation_joule": 0.001163
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0000072
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n50000",
+      "runtime": "python310",
+      "entry_point": "lnHarmonic_n50000.handler",
+      "src": "lnHarmonic_n50000.py",
+      "energy": {
+        "cold_start_joule": 0.069600,
+        "invocation_joule": 0.000817
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.0000288
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n10000",
+      "runtime": "python310",
+      "entry_point": "lnHarmonic_n10000.handler",
+      "src": "lnHarmonic_n10000.py",
+      "energy": {
+        "cold_start_joule": 0.070100,
+        "invocation_joule": 0.000421
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.000144
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n5000",
+      "runtime": "python310",
+      "entry_point": "lnHarmonic_n5000.handler",
+      "src": "lnHarmonic_n5000.py",
+      "energy": {
+        "cold_start_joule": 0.069400,
+        "invocation_joule": 0.000308
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.000288
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "n1000",
+      "runtime": "python310",
+      "entry_point": "lnHarmonic_n1000.handler",
+      "src": "lnHarmonic_n1000.py",
+      "energy": {
+        "cold_start_joule": 0.070500,
+        "invocation_joule": 0.000196
+      },
+      "output": {
+        "type": "error",
+        "error_estimate": 0.001440
+      },
+      "is_approximate": true
+    }
+  ]
+}

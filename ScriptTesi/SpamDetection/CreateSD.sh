@@ -22,24 +22,26 @@ $SERVERLEDGE list 2>/dev/null \
 log_ok "Serverledge functions cleanup completed"
 
 # -------------------------------------------------------
-# SentimentAnalysis — 4 variants on the Pareto front
+# SpamDetection — 4 variants on the Pareto front
 #
-#  Variant          Model                         Params  Acc(SST-2)  Energy/inv
-#  roberta-large    siebert/...roberta-large       355M    96.4%       ~0.092 J
-#  distilbert       distilbert-base-uncased-s2      67M    91.3%       ~0.040 J
-#  bert-tiny        mrm8488/bert-tiny-sst2           4M    84.0%       ~0.012 J
-#  vader            AFINN lexicon (pure Python)      0M    70.0%       ~0.003 J
+#  Variant      Model                                 Params  Acc     Energy/inv (estimate)
+#  roberta-spam mshenoda/roberta-spam                 125M    99.5%   ~0.085 J
+#  distilbert   Falconsai/spam_classification          67M    97.0%   ~0.035 J
+#  bert-tiny    mrm8488/bert-tiny-finetuned-sms-spam   4.4M   95.0%   ~0.010 J
+#  keyword      keyword-heuristic (pure Python)          0M   72.0%   ~0.002 J
+#
+# NOTE: invocation_joule values are initial estimates.
+#       Run ProfileSD.sh to replace with measured values.
 # -------------------------------------------------------
 
-# Creates SentimentAnalysis (roberta-large) + SA-distilbert + SA-bert-tiny + SA-vader automatically
-log_info "Creating SentimentAnalysis with all variants (--approximate)"
+log_info "Creating SpamDetection with all variants (--approximate)"
 $SERVERLEDGE create \
-  --function SentimentAnalysis \
+  --function SpamDetection \
   --runtime python-ml \
-  --src ../../variants/SentimentAnalysis/SAHeavy.py \
-  --handler SAHeavy.handler \
+  --src ../../variants/SpamDetection/SDHeavy.py \
+  --handler SDHeavy.handler \
   --memory 2048 \
   --approximate
 
-log_ok "All SentimentAnalysis variants created (SentimentAnalysis / SentimentAnalysis-distilbert / SentimentAnalysis-bert-tiny / SentimentAnalysis-vader)"
+log_ok "All SpamDetection variants created (SpamDetection / SpamDetection-distilbert / SpamDetection-bert-tiny / SpamDetection-keyword)"
 log_ok "Workflow completed successfully"

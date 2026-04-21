@@ -31,48 +31,14 @@ log_ok "Serverledge functions cleanup completed"
 #  mobilenet-v2-tiny  google/mobilenet_v2_0.35_224   2M    60.3%          ~0.080 J
 # -------------------------------------------------------
 
-log_info "Creating IC-vit-base (ViT base, quality_score=0.818)"
+# Creates ImageClassification (vit-base) + IC-efficientnet-b0 + IC-mobilenet-v2 + IC-mobilenet-v2-tiny automatically
+log_info "Creating ImageClassification with all variants (--approximate)"
 $SERVERLEDGE create \
-  --function IC-vit-base \
-  --logical-name ImageClassification \
+  --function ImageClassification \
   --runtime python-ml \
-  --src ../../examples/Tesi/ImageClassification/ImageClassification.py \
+  --src ../../variants/ImageClassification/ImageClassification.py \
   --handler ImageClassification.handler \
   --memory 2048 \
-  --variant-id vit-base
-log_ok "IC-vit-base created"
+  --approximate
 
-log_info "Creating IC-efficientnet-b0 (EfficientNet-B0, quality_score=0.771)"
-$SERVERLEDGE create \
-  --function IC-efficientnet-b0 \
-  --logical-name ImageClassification \
-  --runtime python-ml \
-  --src ../../examples/Tesi/ImageClassification/ImageClassificationEfficientNetB0.py \
-  --handler ImageClassificationEfficientNetB0.handler \
-  --memory 2048 \
-  --variant-id efficientnet-b0
-log_ok "IC-efficientnet-b0 created"
-
-log_info "Creating IC-mobilenet-v2 (MobileNetV2 1.0, quality_score=0.718)"
-$SERVERLEDGE create \
-  --function IC-mobilenet-v2 \
-  --logical-name ImageClassification \
-  --runtime python-ml \
-  --src ../../examples/Tesi/ImageClassification/ImageClassificationLight.py \
-  --handler ImageClassificationLight.handler \
-  --memory 1024 \
-  --variant-id mobilenet-v2
-log_ok "IC-mobilenet-v2 created"
-
-log_info "Creating IC-mobilenet-v2-tiny (MobileNetV2 0.35, quality_score=0.603)"
-$SERVERLEDGE create \
-  --function IC-mobilenet-v2-tiny \
-  --logical-name ImageClassification \
-  --runtime python-ml \
-  --src ../../examples/Tesi/ImageClassification/ImageClassificationMobileNetTiny.py \
-  --handler ImageClassificationMobileNetTiny.handler \
-  --memory 1024 \
-  --variant-id mobilenet-v2-tiny
-log_ok "IC-mobilenet-v2-tiny created"
-
-log_ok "All ImageClassification variants created"
+log_ok "All ImageClassification variants created (ImageClassification / ImageClassification-efficientnet-b0 / ImageClassification-mobilenet-v2 / ImageClassification-mobilenet-v2-tiny)"

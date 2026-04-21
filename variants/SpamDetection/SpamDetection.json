@@ -1,0 +1,76 @@
+{
+  "variants": [
+    {
+      "id": "roberta-spam",
+      "runtime": "python-ml",
+      "entry_point": "SDHeavy.handler",
+      "src": "SDHeavy.py",
+      "memory_mb": 4096,
+      "energy": {
+        "cold_start_joule": 6.820000000,
+        "invocation_joule": 0.085000000,
+        "measured": false
+      },
+      "output": {
+        "type": "quality",
+        "quality": "high",
+        "quality_score": 0.995
+      },
+      "is_approximate": false
+    },
+    {
+      "id": "distilbert",
+      "runtime": "python-ml",
+      "entry_point": "SDDistilBERT.handler",
+      "src": "SDDistilBERT.py",
+      "memory_mb": 2048,
+      "energy": {
+        "cold_start_joule": 3.100000000,
+        "invocation_joule": 0.035000000,
+        "measured": false
+      },
+      "output": {
+        "type": "quality",
+        "quality": "medium-high",
+        "quality_score": 0.97
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "bert-tiny",
+      "runtime": "python-ml",
+      "entry_point": "SDBertTiny.handler",
+      "src": "SDBertTiny.py",
+      "memory_mb": 1024,
+      "energy": {
+        "cold_start_joule": 1.150000000,
+        "invocation_joule": 0.010000000,
+        "measured": false
+      },
+      "output": {
+        "type": "quality",
+        "quality": "medium-low",
+        "quality_score": 0.95
+      },
+      "is_approximate": true
+    },
+    {
+      "id": "keyword",
+      "runtime": "python310",
+      "entry_point": "SDKeyword.handler",
+      "src": "SDKeyword.py",
+      "memory_mb": 128,
+      "energy": {
+        "cold_start_joule": 0.052000000,
+        "invocation_joule": 0.002000000,
+        "measured": false
+      },
+      "output": {
+        "type": "quality",
+        "quality": "low",
+        "quality_score": 0.72
+      },
+      "is_approximate": true
+    }
+  ]
+}
