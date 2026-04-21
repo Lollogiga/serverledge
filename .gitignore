@@ -6,3 +6,11 @@ images/*/executor
 *.backup
 default.etcd
 vm-setup/
+*/run_all.log
+Sperimentazione/*
+ScriptTesi/*.py
+.gitignore
+ScriptTesi/run_validation_all.sh
+ScriptTesi/RunAll.sh
+ScriptTesi/run_all.sh
+ScriptTesi/run_full_benchmark.sh
