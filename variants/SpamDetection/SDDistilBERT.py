@@ -1,11 +1,11 @@
 from transformers import pipeline
 
-# Falconsai/spam_classification — DistilBERT fine-tuned for spam detection.
-# ~67 M parameters, ~97 % accuracy on mixed SMS + email spam benchmarks.
-# Returns "spam" / "ham" labels.
+# mariagrandury/distilbert-base-uncased-finetuned-sms-spam-detection
+# DistilBERT fine-tuned for SMS spam detection.
+# ~67 M parameters. Returns LABEL_1 (spam) / LABEL_0 (ham).
 _classifier = pipeline(
     "text-classification",
-    model="Falconsai/spam_classification",
+    model="mariagrandury/distilbert-base-uncased-finetuned-sms-spam-detection",
     device=-1,
 )
 

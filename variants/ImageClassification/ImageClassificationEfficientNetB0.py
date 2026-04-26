@@ -6,7 +6,7 @@ from transformers import pipeline
 # competitive accuracy.  (error_estimate = 1 - 0.771 ≈ 0.229)
 _classifier = pipeline(
     "image-classification",
-    model="google/efficientnet_b0",
+    model="google/efficientnet-b0",
     device=-1,
 )
 
